@@ -22,23 +22,21 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-
-interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  availability: string[];
-}
+import { useAppContext } from '../context/AppContext';
+import { Employee } from '../types';
 
 const EmployeeManagement: React.FC = () => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const { state, dispatch } = useAppContext();
+  const { employees } = state;
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     role: '',
+    phone: '',
+    availability: {},
+    color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
   });
 
   const handleOpenDialog = (employee?: Employee) => {
@@ -48,6 +46,9 @@ const EmployeeManagement: React.FC = () => {
         name: employee.name,
         email: employee.email,
         role: employee.role,
+        phone: employee.phone,
+        availability: employee.availability,
+        color: employee.color,
       });
     } else {
       setSelectedEmployee(null);
@@ -55,6 +56,9 @@ const EmployeeManagement: React.FC = () => {
         name: '',
         email: '',
         role: '',
+        phone: '',
+        availability: {},
+        color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
       });
     }
     setOpenDialog(true);
@@ -67,31 +71,35 @@ const EmployeeManagement: React.FC = () => {
       name: '',
       email: '',
       role: '',
+      phone: '',
+      availability: {},
+      color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
     });
   };
 
   const handleSaveEmployee = () => {
     if (selectedEmployee) {
       // Update existing employee
-      setEmployees(employees.map(emp =>
-        emp.id === selectedEmployee.id
-          ? { ...emp, ...formData }
-          : emp
-      ));
+      dispatch({
+        type: 'UPDATE_EMPLOYEE',
+        payload: {
+          ...selectedEmployee,
+          ...formData,
+        },
+      });
     } else {
       // Add new employee
       const newEmployee: Employee = {
         id: Date.now().toString(),
         ...formData,
-        availability: [],
       };
-      setEmployees([...employees, newEmployee]);
+      dispatch({ type: 'ADD_EMPLOYEE', payload: newEmployee });
     }
     handleCloseDialog();
   };
 
   const handleDeleteEmployee = (id: string) => {
-    setEmployees(employees.filter(emp => emp.id !== id));
+    dispatch({ type: 'DELETE_EMPLOYEE', payload: id });
   };
 
   return (
@@ -113,6 +121,7 @@ const EmployeeManagement: React.FC = () => {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Email</TableCell>
+              <TableCell>Phone</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
@@ -122,6 +131,7 @@ const EmployeeManagement: React.FC = () => {
               <TableRow key={employee.id}>
                 <TableCell>{employee.name}</TableCell>
                 <TableCell>{employee.email}</TableCell>
+                <TableCell>{employee.phone}</TableCell>
                 <TableCell>{employee.role}</TableCell>
                 <TableCell>
                   <IconButton onClick={() => handleOpenDialog(employee)}>
@@ -156,6 +166,13 @@ const EmployeeManagement: React.FC = () => {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              sx={{ mb: 2 }}
+            />
+            <TextField
+              fullWidth
+              label="Phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               sx={{ mb: 2 }}
             />
             <TextField
