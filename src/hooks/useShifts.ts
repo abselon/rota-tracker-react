@@ -58,7 +58,7 @@ export function useShifts() {
     }
 
     // Check for conflicts
-    if (checkShiftConflicts(state.assignments, assignment.employeeId, startTime, endTime)) {
+    if (checkShiftConflicts(state.assignments, assignment.employeeId, startTime, endTime, state.shifts)) {
       return false;
     }
 

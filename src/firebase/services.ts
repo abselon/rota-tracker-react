@@ -69,9 +69,21 @@ export const updateEmployee = async (id: string, employee: Partial<Employee>): P
   });
 };
 
-export const deleteEmployee = async (id: string): Promise<void> => {
-  const employeeRef = doc(db, 'employees', id);
-  await deleteDoc(employeeRef);
+export const deleteEmployee = async (employeeId: string): Promise<void> => {
+  // Delete the employee
+  await deleteDoc(doc(db, 'employees', employeeId));
+
+  // Find and delete all assignments for this employee
+  const assignmentsQuery = query(
+    collection(db, 'assignments'),
+    where('employeeId', '==', employeeId)
+  );
+  const assignmentsSnapshot = await getDocs(assignmentsQuery);
+  
+  // Delete all assignments in parallel
+  await Promise.all(
+    assignmentsSnapshot.docs.map((doc) => deleteDoc(doc.ref))
+  );
 };
 
 // Shifts
@@ -101,9 +113,21 @@ export const updateShift = async (id: string, shift: Partial<Shift>): Promise<vo
   });
 };
 
-export const deleteShift = async (id: string): Promise<void> => {
-  const shiftRef = doc(db, 'shifts', id);
-  await deleteDoc(shiftRef);
+export const deleteShift = async (shiftId: string): Promise<void> => {
+  // Delete the shift
+  await deleteDoc(doc(db, 'shifts', shiftId));
+
+  // Find and delete all assignments for this shift
+  const assignmentsQuery = query(
+    collection(db, 'assignments'),
+    where('shiftId', '==', shiftId)
+  );
+  const assignmentsSnapshot = await getDocs(assignmentsQuery);
+  
+  // Delete all assignments in parallel
+  await Promise.all(
+    assignmentsSnapshot.docs.map((doc) => deleteDoc(doc.ref))
+  );
 };
 
 // Shift Assignments

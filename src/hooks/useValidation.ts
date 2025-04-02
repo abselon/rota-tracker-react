@@ -92,7 +92,8 @@ export function useValidation() {
         state.assignments,
         assignment.employeeId,
         startTime,
-        endTime
+        endTime,
+        state.shifts
       )) {
         errors.push({ field: 'conflict', message: 'Employee has a conflicting shift' });
       }

@@ -22,19 +22,23 @@ import {
   InputLabel,
   CircularProgress,
   Alert,
+  Tooltip,
+  DialogContentText,
+  Stack,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Add as AddIcon,
+  Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
+import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
 import { Shift, Employee, ShiftAssignment } from '../types';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, formatTime } from '../utils/dateUtils';
 
 const RotaCalendar: React.FC = () => {
-  const { state, addAssignment } = useAppContext();
+  const { state, addAssignment, deleteAssignment } = useAppContext();
   const { employees, shifts, assignments, isLoading, error } = state;
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [openDialog, setOpenDialog] = useState(false);
@@ -44,6 +48,8 @@ const RotaCalendar: React.FC = () => {
     shiftId: '',
     date: '',
   });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<ShiftAssignment | null>(null);
 
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Start from Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -90,9 +96,31 @@ const RotaCalendar: React.FC = () => {
   };
 
   const getAssignmentsForDay = (date: Date) => {
-    return assignments.filter(
-      (assignment) => formatDate(new Date(assignment.date)) === formatDate(date)
+    return assignments.filter((assignment) => 
+      isSameDay(new Date(assignment.date), date)
     );
+  };
+
+  const handleDeleteClick = (assignment: ShiftAssignment) => {
+    setAssignmentToDelete(assignment);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (assignmentToDelete) {
+      await deleteAssignment(assignmentToDelete.id);
+      setDeleteDialogOpen(false);
+      setAssignmentToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setAssignmentToDelete(null);
+  };
+
+  const formatShiftTime = (timeStr: string): string => {
+    return timeStr; // Already in HH:mm format
   };
 
   if (isLoading) {
@@ -151,29 +179,68 @@ const RotaCalendar: React.FC = () => {
                 </TableCell>
                 {weekDays.map((day) => {
                   const dayAssignments = getAssignmentsForDay(day);
-                  const employeeAssignment = dayAssignments.find(
+                  const employeeAssignments = dayAssignments.filter(
                     (assignment) => assignment.employeeId === employee.id
                   );
-                  const shift = employeeAssignment
-                    ? shifts.find((s) => s.id === employeeAssignment.shiftId)
-                    : null;
 
                   return (
                     <TableCell key={day.toString()} align="center">
-                      {shift ? (
-                        <Box
+                      <Stack spacing={1}>
+                        {employeeAssignments.map((assignment) => {
+                          const shift = shifts.find((s) => s.id === assignment.shiftId);
+                          if (!shift) return null;
+                          return (
+                            <Tooltip
+                              key={assignment.id}
+                              title={`${shift.name}\n${formatShiftTime(shift.startTime)} - ${formatShiftTime(shift.endTime)}`}
+                            >
+                              <Box
+                                sx={{
+                                  backgroundColor: shift.color || '#e0e0e0',
+                                  p: 1,
+                                  borderRadius: 1,
+                                  cursor: 'pointer',
+                                  position: 'relative',
+                                }}
+                              >
+                                <Typography variant="body2">{shift.name}</Typography>
+                                <Typography variant="caption">
+                                  {formatShiftTime(shift.startTime)} - {formatShiftTime(shift.endTime)}
+                                </Typography>
+                                <IconButton
+                                  size="small"
+                                  sx={{
+                                    position: 'absolute',
+                                    top: -8,
+                                    right: -8,
+                                    backgroundColor: 'white',
+                                    boxShadow: 1,
+                                    '&:hover': { backgroundColor: '#f5f5f5' }
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAssignmentToDelete(assignment);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            </Tooltip>
+                          );
+                        })}
+                        <IconButton
+                          size="small"
                           sx={{
-                            backgroundColor: shift.color || '#e0e0e0',
-                            p: 1,
-                            borderRadius: 1,
+                            mt: 1,
+                            backgroundColor: '#f5f5f5',
+                            '&:hover': { backgroundColor: '#e0e0e0' }
                           }}
+                          onClick={() => handleAddShift(day)}
                         >
-                          <Typography variant="body2">{shift.name}</Typography>
-                          <Typography variant="caption">
-                            {shift.startTime} - {shift.endTime}
-                          </Typography>
-                        </Box>
-                      ) : null}
+                          <AddIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
                     </TableCell>
                   );
                 })}
@@ -227,6 +294,21 @@ const RotaCalendar: React.FC = () => {
           <Button onClick={handleCloseDialog}>Cancel</Button>
           <Button onClick={handleSaveAssignment} variant="contained">
             Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
+        <DialogTitle>Delete Assignment</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Are you sure you want to delete this shift assignment? This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete}>Cancel</Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

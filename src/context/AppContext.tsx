@@ -210,13 +210,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const deleteEmployee = async (id: string) => {
+  const deleteEmployee = async (employeeId: string) => {
     try {
-      await firebaseServices.deleteEmployee(id);
-      dispatch({ type: 'DELETE_EMPLOYEE', payload: id });
+      dispatch({ type: 'SET_LOADING', payload: true });
+      await firebaseServices.deleteEmployee(employeeId);
+      
+      // Remove employee from state
+      dispatch({ type: 'DELETE_EMPLOYEE', payload: employeeId });
+      
+      // Remove all assignments for this employee from state
+      const employeeAssignments = state.assignments.filter(
+        (assignment) => assignment.employeeId === employeeId
+      );
+      employeeAssignments.forEach((assignment) => {
+        dispatch({ type: 'DELETE_ASSIGNMENT', payload: assignment.id });
+      });
+      
+      dispatch({ type: 'SET_LOADING', payload: false });
     } catch (error) {
-      console.error('Error deleting employee:', error);
       dispatch({ type: 'SET_ERROR', payload: 'Failed to delete employee' });
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
@@ -240,13 +253,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const deleteShift = async (id: string) => {
+  const deleteShift = async (shiftId: string) => {
     try {
-      await firebaseServices.deleteShift(id);
-      dispatch({ type: 'DELETE_SHIFT', payload: id });
+      dispatch({ type: 'SET_LOADING', payload: true });
+      await firebaseServices.deleteShift(shiftId);
+      
+      // Remove shift from state
+      dispatch({ type: 'DELETE_SHIFT', payload: shiftId });
+      
+      // Remove all assignments for this shift from state
+      const shiftAssignments = state.assignments.filter(
+        (assignment) => assignment.shiftId === shiftId
+      );
+      shiftAssignments.forEach((assignment) => {
+        dispatch({ type: 'DELETE_ASSIGNMENT', payload: assignment.id });
+      });
+      
+      dispatch({ type: 'SET_LOADING', payload: false });
     } catch (error) {
-      console.error('Error deleting shift:', error);
       dispatch({ type: 'SET_ERROR', payload: 'Failed to delete shift' });
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
