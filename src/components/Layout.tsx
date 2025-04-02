@@ -21,6 +21,7 @@ import {
   People as PeopleIcon,
   AccessTime as ShiftIcon,
   CalendarViewWeek as ScheduleIcon,
+  Schedule as TimeCalendarIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -37,7 +38,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Calendar', icon: <CalendarIcon />, path: '/calendar' },
+    { text: 'Employee Calendar', icon: <CalendarIcon />, path: '/calendar' },
+    { text: 'Shift Calendar', icon: <TimeCalendarIcon />, path: '/shift-calendar' },
     { text: 'Employees', icon: <PeopleIcon />, path: '/employees' },
     { text: 'Shifts', icon: <ShiftIcon />, path: '/shifts' },
     { text: 'Schedules', icon: <ScheduleIcon />, path: '/schedules' },
