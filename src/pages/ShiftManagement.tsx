@@ -16,6 +16,8 @@ import {
   DialogActions,
   TextField,
   IconButton,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
@@ -33,8 +35,8 @@ interface FormData {
 }
 
 export default function ShiftManagement() {
-  const { state, dispatch } = useAppContext();
-  const { shifts } = state;
+  const { state, addShift, updateShift, deleteShift } = useAppContext();
+  const { shifts, isLoading, error } = state;
   const [open, setOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [formData, setFormData] = useState<FormData>({
@@ -84,9 +86,8 @@ export default function ShiftManagement() {
     setEditingShift(null);
   };
 
-  const handleSubmit = () => {
-    const newShift: Shift = {
-      id: editingShift?.id || Date.now().toString(),
+  const handleSubmit = async () => {
+    const newShift: Omit<Shift, 'id'> = {
       name: formData.name,
       startTime: formatTime(formData.startTime),
       endTime: formatTime(formData.endTime),
@@ -95,21 +96,44 @@ export default function ShiftManagement() {
       color: editingShift?.color || `#${Math.floor(Math.random()*16777215).toString(16)}`,
     };
 
-    if (editingShift) {
-      dispatch({ type: 'UPDATE_SHIFT', payload: newShift });
-    } else {
-      dispatch({ type: 'ADD_SHIFT', payload: newShift });
+    try {
+      if (editingShift) {
+        await updateShift(editingShift.id, newShift);
+      } else {
+        await addShift(newShift);
+      }
+      handleClose();
+    } catch (error) {
+      console.error('Error saving shift:', error);
     }
-
-    handleClose();
   };
 
-  const handleDelete = (shiftId: string) => {
-    dispatch({ type: 'DELETE_SHIFT', payload: shiftId });
+  const handleDelete = async (shiftId: string) => {
+    if (window.confirm('Are you sure you want to delete this shift?')) {
+      try {
+        await deleteShift(shiftId);
+      } catch (error) {
+        console.error('Error deleting shift:', error);
+      }
+    }
   };
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h4">Shift Management</Typography>
         <Button variant="contained" onClick={() => handleOpen()}>
@@ -130,23 +154,31 @@ export default function ShiftManagement() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {shifts.map((shift) => (
-              <TableRow key={shift.id}>
-                <TableCell>{shift.name}</TableCell>
-                <TableCell>{shift.startTime}</TableCell>
-                <TableCell>{shift.endTime}</TableCell>
-                <TableCell>{shift.duration}</TableCell>
-                <TableCell>{shift.requiredEmployees}</TableCell>
-                <TableCell>
-                  <IconButton onClick={() => handleOpen(shift)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleDelete(shift.id)}>
-                    <DeleteIcon />
-                  </IconButton>
+            {shifts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  No shifts found. Add your first shift to get started.
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              shifts.map((shift) => (
+                <TableRow key={shift.id}>
+                  <TableCell>{shift.name}</TableCell>
+                  <TableCell>{shift.startTime}</TableCell>
+                  <TableCell>{shift.endTime}</TableCell>
+                  <TableCell>{shift.duration}</TableCell>
+                  <TableCell>{shift.requiredEmployees}</TableCell>
+                  <TableCell>
+                    <IconButton onClick={() => handleOpen(shift)}>
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleDelete(shift.id)}>
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </TableContainer>

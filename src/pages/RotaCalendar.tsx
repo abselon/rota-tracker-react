@@ -20,6 +20,8 @@ import {
   Select,
   FormControl,
   InputLabel,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
@@ -32,8 +34,8 @@ import { Shift, Employee, ShiftAssignment } from '../types';
 import { formatDate } from '../utils/dateUtils';
 
 const RotaCalendar: React.FC = () => {
-  const { state, dispatch } = useAppContext();
-  const { employees, shifts, assignments } = state;
+  const { state, addAssignment } = useAppContext();
+  const { employees, shifts, assignments, isLoading, error } = state;
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -74,16 +76,15 @@ const RotaCalendar: React.FC = () => {
     });
   };
 
-  const handleSaveAssignment = () => {
+  const handleSaveAssignment = async () => {
     if (formData.employeeId && formData.shiftId && formData.date) {
-      const newAssignment: ShiftAssignment = {
-        id: Date.now().toString(),
+      const newAssignment: Omit<ShiftAssignment, 'id'> = {
         employeeId: formData.employeeId,
         shiftId: formData.shiftId,
         date: formData.date,
         status: 'pending',
       };
-      dispatch({ type: 'ADD_ASSIGNMENT', payload: newAssignment });
+      await addAssignment(newAssignment);
       handleCloseDialog();
     }
   };
@@ -94,8 +95,22 @@ const RotaCalendar: React.FC = () => {
     );
   };
 
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
   return (
     <Box>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4">Weekly Rota</Typography>
         <Box>

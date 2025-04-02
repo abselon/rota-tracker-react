@@ -20,6 +20,7 @@ import {
   CalendarMonth as CalendarIcon,
   People as PeopleIcon,
   AccessTime as ShiftIcon,
+  CalendarViewWeek as ScheduleIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -39,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { text: 'Calendar', icon: <CalendarIcon />, path: '/calendar' },
     { text: 'Employees', icon: <PeopleIcon />, path: '/employees' },
     { text: 'Shifts', icon: <ShiftIcon />, path: '/shifts' },
+    { text: 'Schedules', icon: <ScheduleIcon />, path: '/schedules' },
   ];
 
   const handleDrawerToggle = () => {
@@ -56,7 +58,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {menuItems.map((item) => (
           <ListItemButton
             key={item.text}
-            onClick={() => navigate(item.path)}
+            onClick={() => {
+              navigate(item.path);
+              setMobileOpen(false);
+            }}
             selected={location.pathname === item.path}
           >
             <ListItemIcon>{item.icon}</ListItemIcon>
@@ -88,20 +93,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div">
-            {menuItems.find(item => item.path === location.pathname)?.text || 'ROTA Tracker'}
+            {menuItems.find((item) => item.path === location.pathname)?.text || 'ROTA Tracker'}
           </Typography>
         </Toolbar>
       </AppBar>
       <Box
         component="nav"
         sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+        aria-label="mailbox folders"
       >
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true,
+            keepMounted: true, // Better open performance on mobile.
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },

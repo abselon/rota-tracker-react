@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import RotaCalendar from './pages/RotaCalendar';
 import EmployeeManagement from './pages/EmployeeManagement';
 import ShiftManagement from './pages/ShiftManagement';
+import WeeklyScheduleManagement from './pages/WeeklyScheduleManagement';
 import theme from './theme';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
               <Route path="/calendar" element={<RotaCalendar />} />
               <Route path="/employees" element={<EmployeeManagement />} />
               <Route path="/shifts" element={<ShiftManagement />} />
+              <Route path="/schedules" element={<WeeklyScheduleManagement />} />
             </Routes>
           </Layout>
         </Router>
