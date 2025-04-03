@@ -51,4 +51,32 @@ export interface DayHours {
   isOpen: boolean;
   openTime?: string; // HH:mm format
   closeTime?: string; // HH:mm format
+}
+
+export interface EmployeeInsights {
+  employeeId: string;
+  totalHours: {
+    weekly: number;
+    monthly: number;
+    custom: number;
+  };
+  completedHours: {
+    weekly: number;
+    monthly: number;
+    custom: number;
+  };
+  futureHours: {
+    weekly: number;
+    monthly: number;
+    custom: number;
+  };
+  shiftBreakdown: {
+    [shiftId: string]: {
+      name: string;
+      hours: number;
+      completed: number;
+      upcoming: number;
+    };
+  };
+  lastUpdated: string;
 } 
