@@ -135,12 +135,22 @@ export default function ShiftManagement() {
       
       if (assignment.isOvernight) {
         // For overnight shifts, calculate hours that fall on this day
-        const [shiftStartHour] = assignment.startTime.split(':').map(Number);
-        const [shiftEndHour] = (assignment.nextDayEndTime || '00:00').split(':').map(Number);
+        const [startHour, startMinute] = assignment.startTime.split(':').map(Number);
+        const [endHour, endMinute] = assignment.endTime.split(':').map(Number);
         
-        // Calculate hours from start until midnight (24 - shiftStartHour)
-        // Plus hours from midnight until end time (shiftEndHour)
-        return total + ((24 - shiftStartHour) + shiftEndHour);
+        // Convert times to minutes for more accurate calculation
+        const startMinutes = startHour * 60 + startMinute;
+        const endMinutes = endHour * 60 + endMinute;
+        
+        if (assignment.startTime === '00:00') {
+          // If this is the continuation of an overnight shift (starts at midnight)
+          // Just count the hours until the end time
+          return total + (endMinutes / 60);
+        } else {
+          // If this is the start of an overnight shift
+          // Count hours from start until midnight
+          return total + ((24 * 60 - startMinutes) / 60);
+        }
       }
       
       return total + shift.duration;
