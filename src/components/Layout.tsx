@@ -13,6 +13,10 @@ import {
   Toolbar,
   Typography,
   useTheme,
+  Avatar,
+  Tooltip,
+  Divider,
+  Badge,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -22,9 +26,11 @@ import {
   AccessTime as ShiftIcon,
   CalendarViewWeek as ScheduleIcon,
   Schedule as TimeCalendarIcon,
+  Notifications as NotificationsIcon,
+  Settings as SettingsIcon,
 } from '@mui/icons-material';
 
-const drawerWidth = 240;
+const drawerWidth = 280;
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -50,13 +56,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const drawer = (
-    <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Toolbar sx={{ px: 2 }}>
+        <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 700 }}>
           ROTA Tracker
         </Typography>
       </Toolbar>
-      <List>
+      <Divider />
+      <List sx={{ flex: 1, px: 1 }}>
         {menuItems.map((item) => (
           <ListItemButton
             key={item.text}
@@ -65,23 +72,51 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               setMobileOpen(false);
             }}
             selected={location.pathname === item.path}
+            sx={{
+              mb: 0.5,
+              borderRadius: 2,
+              '&.Mui-selected': {
+                backgroundColor: 'primary.light',
+                color: 'primary.main',
+                '&:hover': {
+                  backgroundColor: 'primary.light',
+                },
+                '& .MuiListItemIcon-root': {
+                  color: 'primary.main',
+                },
+              },
+            }}
           >
-            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
             <ListItemText primary={item.text} />
           </ListItemButton>
         ))}
       </List>
-    </div>
+      <Divider />
+      <List sx={{ px: 1 }}>
+        <ListItemButton sx={{ borderRadius: 2, mb: 0.5 }}>
+          <ListItemIcon sx={{ minWidth: 40 }}>
+            <SettingsIcon />
+          </ListItemIcon>
+          <ListItemText primary="Settings" />
+        </ListItemButton>
+      </List>
+    </Box>
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
       <AppBar
         position="fixed"
         sx={{
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           ml: { sm: `${drawerWidth}px` },
+          backgroundColor: 'background.paper',
+          color: 'text.primary',
+          boxShadow: 'none',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
         }}
       >
         <Toolbar>
@@ -94,9 +129,23 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div">
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {menuItems.find((item) => item.path === location.pathname)?.text || 'ROTA Tracker'}
           </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Tooltip title="Notifications">
+              <IconButton>
+                <Badge badgeContent={3} color="error">
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Profile">
+              <IconButton>
+                <Avatar sx={{ width: 32, height: 32 }}>U</Avatar>
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Toolbar>
       </AppBar>
       <Box
@@ -109,7 +158,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
+            keepMounted: true,
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
@@ -136,6 +185,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           p: 3,
           width: { sm: `calc(100% - ${drawerWidth}px)` },
           mt: '64px',
+          backgroundColor: 'background.default',
+          minHeight: 'calc(100vh - 64px)',
         }}
       >
         {children}

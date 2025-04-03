@@ -25,12 +25,21 @@ import {
   Tooltip,
   DialogContentText,
   Stack,
+  Chip,
+  Card,
+  CardContent,
+  Grid,
+  Fade,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
+  Event as EventIcon,
+  Person as PersonIcon,
+  AccessTime as TimeIcon,
 } from '@mui/icons-material';
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
@@ -40,65 +49,35 @@ import { formatDate, formatTime } from '../utils/dateUtils';
 const RotaCalendar: React.FC = () => {
   const { state, addAssignment, deleteAssignment } = useAppContext();
   const { employees, shifts, assignments, isLoading, error } = state;
-  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [formData, setFormData] = useState({
-    employeeId: '',
-    shiftId: '',
-    date: '',
-  });
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<ShiftAssignment | null>(null);
 
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Start from Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
   const handlePreviousWeek = () => {
-    setCurrentWeek(subWeeks(currentWeek, 1));
+    setWeekStart(subWeeks(weekStart, 1));
   };
 
   const handleNextWeek = () => {
-    setCurrentWeek(addWeeks(currentWeek, 1));
+    setWeekStart(addWeeks(weekStart, 1));
   };
 
-  const handleAddShift = (date: Date) => {
+  const handleOpenDialog = (date: Date, shift?: Shift) => {
     setSelectedDate(date);
-    setFormData({
-      employeeId: '',
-      shiftId: '',
-      date: formatDate(date),
-    });
+    setSelectedShift(shift || null);
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedDate(null);
-    setFormData({
-      employeeId: '',
-      shiftId: '',
-      date: '',
-    });
-  };
-
-  const handleSaveAssignment = async () => {
-    if (formData.employeeId && formData.shiftId && formData.date) {
-      const newAssignment: Omit<ShiftAssignment, 'id'> = {
-        employeeId: formData.employeeId,
-        shiftId: formData.shiftId,
-        date: formData.date,
-        status: 'pending',
-      };
-      await addAssignment(newAssignment);
-      handleCloseDialog();
-    }
-  };
-
-  const getAssignmentsForDay = (date: Date) => {
-    return assignments.filter((assignment) => 
-      isSameDay(new Date(assignment.date), date)
-    );
+    setSelectedShift(null);
+    setSelectedEmployee(null);
   };
 
   const handleDeleteClick = (assignment: ShiftAssignment) => {
@@ -106,7 +85,7 @@ const RotaCalendar: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = async () => {
+  const handleDeleteConfirm = async () => {
     if (assignmentToDelete) {
       await deleteAssignment(assignmentToDelete.id);
       setDeleteDialogOpen(false);
@@ -114,13 +93,32 @@ const RotaCalendar: React.FC = () => {
     }
   };
 
-  const handleCancelDelete = () => {
-    setDeleteDialogOpen(false);
-    setAssignmentToDelete(null);
+  const handleSubmit = async () => {
+    if (selectedDate && selectedEmployee && selectedShift) {
+      await addAssignment({
+        date: selectedDate.toISOString(),
+        employeeId: selectedEmployee.id,
+        shiftId: selectedShift.id,
+        status: 'pending',
+      });
+      handleCloseDialog();
+    }
   };
 
-  const formatShiftTime = (timeStr: string): string => {
-    return timeStr; // Already in HH:mm format
+  const getAssignmentsForDate = (date: Date) => {
+    return assignments.filter((assignment) =>
+      isSameDay(new Date(assignment.date), date)
+    );
+  };
+
+  const getEmployeeName = (employeeId: string) => {
+    const employee = employees.find((e) => e.id === employeeId);
+    return employee?.name || 'Unknown Employee';
+  };
+
+  const getShiftName = (shiftId: string) => {
+    const shift = shifts.find((s) => s.id === shiftId);
+    return shift?.name || 'Unknown Shift';
   };
 
   if (isLoading) {
@@ -132,134 +130,134 @@ const RotaCalendar: React.FC = () => {
   }
 
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
-      
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Weekly Rota</Typography>
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <IconButton onClick={handlePreviousWeek}>
+          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+            Employee Calendar
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary">
+            {format(weekStart, 'MMMM d')} - {format(addDays(weekStart, 6), 'MMMM d, yyyy')}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton onClick={handlePreviousWeek} size="large">
             <ChevronLeftIcon />
           </IconButton>
-          <Typography variant="h6" component="span" sx={{ mx: 2 }}>
-            {format(weekStart, 'MMMM d, yyyy')}
-          </Typography>
-          <IconButton onClick={handleNextWeek}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog(new Date())}
+          >
+            Add Assignment
+          </Button>
+          <IconButton onClick={handleNextWeek} size="large">
             <ChevronRightIcon />
           </IconButton>
         </Box>
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Employee</TableCell>
-              {weekDays.map((day) => (
-                <TableCell key={day.toString()} align="center">
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <Typography>{format(day, 'EEE d')}</Typography>
-                    <IconButton size="small" onClick={() => handleAddShift(day)}>
-                      <AddIcon fontSize="small" />
-                    </IconButton>
+      <Grid container spacing={3}>
+        {weekDays.map((day) => {
+          const dayAssignments = getAssignmentsForDate(day);
+          return (
+            <Grid item xs={12} md={4} key={day.toString()}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                      {format(day, 'EEEE, MMMM d')}
+                    </Typography>
+                    <Chip
+                      label={`${dayAssignments.length} assignments`}
+                      size="small"
+                      color={dayAssignments.length > 0 ? 'primary' : 'default'}
+                    />
                   </Box>
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {employees.map((employee) => (
-              <TableRow key={employee.id}>
-                <TableCell component="th" scope="row">
-                  {employee.name}
-                </TableCell>
-                {weekDays.map((day) => {
-                  const dayAssignments = getAssignmentsForDay(day);
-                  const employeeAssignments = dayAssignments.filter(
-                    (assignment) => assignment.employeeId === employee.id
-                  );
-
-                  return (
-                    <TableCell key={day.toString()} align="center">
-                      <Stack spacing={1}>
-                        {employeeAssignments.map((assignment) => {
-                          const shift = shifts.find((s) => s.id === assignment.shiftId);
-                          if (!shift) return null;
-                          return (
-                            <Tooltip
-                              key={assignment.id}
-                              title={`${shift.name}\n${formatShiftTime(shift.startTime)} - ${formatShiftTime(shift.endTime)}`}
-                            >
-                              <Box
-                                sx={{
-                                  backgroundColor: shift.color || '#e0e0e0',
-                                  p: 1,
-                                  borderRadius: 1,
-                                  cursor: 'pointer',
-                                  position: 'relative',
-                                }}
-                              >
-                                <Typography variant="body2">{shift.name}</Typography>
-                                <Typography variant="caption">
-                                  {formatShiftTime(shift.startTime)} - {formatShiftTime(shift.endTime)}
-                                </Typography>
+                  {dayAssignments.length === 0 ? (
+                    <Typography color="text.secondary" align="center" sx={{ py: 2 }}>
+                      No assignments
+                    </Typography>
+                  ) : (
+                    <Stack spacing={2}>
+                      {dayAssignments.map((assignment) => {
+                        const employee = employees.find((e) => e.id === assignment.employeeId);
+                        const shift = shifts.find((s) => s.id === assignment.shiftId);
+                        return (
+                          <Paper
+                            key={assignment.id}
+                            sx={{
+                              p: 2,
+                              backgroundColor: 'background.default',
+                              position: 'relative',
+                              '&:hover': {
+                                backgroundColor: 'action.hover',
+                              },
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                              <PersonIcon color="primary" fontSize="small" />
+                              <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
+                                {employee?.name || 'Unknown Employee'}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <TimeIcon color="action" fontSize="small" />
+                              <Typography variant="body2" color="text.secondary">
+                                {shift?.name || 'Unknown Shift'}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
+                              <Tooltip title="Delete assignment">
                                 <IconButton
                                   size="small"
-                                  sx={{
-                                    position: 'absolute',
-                                    top: -8,
-                                    right: -8,
-                                    backgroundColor: 'white',
-                                    boxShadow: 1,
-                                    '&:hover': { backgroundColor: '#f5f5f5' }
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setAssignmentToDelete(assignment);
-                                    setDeleteDialogOpen(true);
-                                  }}
+                                  onClick={() => handleDeleteClick(assignment)}
+                                  sx={{ color: 'error.main' }}
                                 >
                                   <DeleteIcon fontSize="small" />
                                 </IconButton>
-                              </Box>
-                            </Tooltip>
-                          );
-                        })}
-                        <IconButton
-                          size="small"
-                          sx={{
-                            mt: 1,
-                            backgroundColor: '#f5f5f5',
-                            '&:hover': { backgroundColor: '#e0e0e0' }
-                          }}
-                          onClick={() => handleAddShift(day)}
-                        >
-                          <AddIcon fontSize="small" />
-                        </IconButton>
-                      </Stack>
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                              </Tooltip>
+                            </Box>
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  )}
+                  <Button
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    fullWidth
+                    sx={{ mt: 2 }}
+                    onClick={() => handleOpenDialog(day)}
+                  >
+                    Add Assignment
+                  </Button>
+                </CardContent>
+              </Card>
+            </Grid>
+          );
+        })}
+      </Grid>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>Add Shift Assignment</DialogTitle>
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Assignment</DialogTitle>
         <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Stack spacing={3} sx={{ mt: 2 }}>
             <FormControl fullWidth>
               <InputLabel>Employee</InputLabel>
               <Select
-                value={formData.employeeId}
+                value={selectedEmployee?.id || ''}
+                onChange={(e) => {
+                  const employee = employees.find((emp) => emp.id === e.target.value);
+                  setSelectedEmployee(employee || null);
+                }}
                 label="Employee"
-                onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
               >
                 {employees.map((employee) => (
                   <MenuItem key={employee.id} value={employee.id}>
@@ -268,46 +266,57 @@ const RotaCalendar: React.FC = () => {
                 ))}
               </Select>
             </FormControl>
+
             <FormControl fullWidth>
               <InputLabel>Shift</InputLabel>
               <Select
-                value={formData.shiftId}
+                value={selectedShift?.id || ''}
+                onChange={(e) => {
+                  const shift = shifts.find((s) => s.id === e.target.value);
+                  setSelectedShift(shift || null);
+                }}
                 label="Shift"
-                onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
               >
                 {shifts.map((shift) => (
                   <MenuItem key={shift.id} value={shift.id}>
-                    {shift.name} ({shift.startTime} - {shift.endTime})
+                    {shift.name}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
+
             <TextField
-              fullWidth
               label="Date"
-              value={formData.date}
-              disabled
+              type="date"
+              value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+              onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
             />
-          </Box>
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveAssignment} variant="contained">
-            Save
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={!selectedEmployee || !selectedShift || !selectedDate}
+          >
+            Add Assignment
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Delete Assignment</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete this shift assignment? This action cannot be undone.
+            Are you sure you want to delete this assignment? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCancelDelete}>Cancel</Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
             Delete
           </Button>
         </DialogActions>

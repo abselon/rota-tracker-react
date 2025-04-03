@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Paper,
@@ -21,207 +21,412 @@ import {
   Select,
   FormControl,
   InputLabel,
-  CircularProgress,
-  Alert,
-  Tooltip,
   Stack,
   Chip,
+  Tooltip,
+  Popover,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
+  Person as PersonIcon,
+  AccessTime as TimeIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
 import { Shift, ShiftAssignment } from '../types';
-import { formatDate } from '../utils/dateUtils';
 
 const ShiftBasedCalendar: React.FC = () => {
   const { state, addAssignment, deleteAssignment } = useAppContext();
-  const { employees, shifts, assignments, isLoading, error } = state;
-  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const { employees, shifts, assignments } = state;
+  const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [openDialog, setOpenDialog] = useState(false);
-  const [formData, setFormData] = useState({
-    employeeId: '',
-    shiftId: '',
-    date: '',
-  });
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<ShiftAssignment | null>(null);
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [selectedCell, setSelectedCell] = useState<{ date: Date; shift: Shift } | null>(null);
 
-  const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Start from Monday
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-  // Sort shifts by start time
-  const sortedShifts = useMemo(() => {
-    return [...shifts].sort((a, b) => {
-      const [aHours, aMinutes] = a.startTime.split(':').map(Number);
-      const [bHours, bMinutes] = b.startTime.split(':').map(Number);
-      return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
-    });
-  }, [shifts]);
-
   const handlePreviousWeek = () => {
-    setCurrentWeek(subWeeks(currentWeek, 1));
+    setWeekStart(subWeeks(weekStart, 1));
   };
 
   const handleNextWeek = () => {
-    setCurrentWeek(addWeeks(currentWeek, 1));
+    setWeekStart(addWeeks(weekStart, 1));
   };
 
-  const handleAddAssignment = (shiftId: string, date: Date) => {
-    setFormData({
-      employeeId: '',
-      shiftId: shiftId,
-      date: formatDate(date),
-    });
+  const handleOpenDialog = (date: Date, shift?: Shift) => {
+    setSelectedDate(date);
+    setSelectedShift(shift || null);
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
-    setFormData({
-      employeeId: '',
-      shiftId: '',
-      date: '',
-    });
+    setSelectedDate(null);
+    setSelectedShift(null);
+    setSelectedEmployee('');
   };
 
-  const handleSaveAssignment = async () => {
-    if (formData.employeeId && formData.shiftId && formData.date) {
-      const newAssignment: Omit<ShiftAssignment, 'id'> = {
-        employeeId: formData.employeeId,
-        shiftId: formData.shiftId,
-        date: formData.date,
-        status: 'pending',
-      };
-      await addAssignment(newAssignment);
-      handleCloseDialog();
-    }
-  };
-
-  const getAssignmentsForDay = (date: Date, shiftId: string) => {
-    return assignments.filter((assignment) => 
-      isSameDay(new Date(assignment.date), date) && assignment.shiftId === shiftId
-    );
-  };
-
-  const handleDeleteAssignment = (assignment: ShiftAssignment) => {
+  const handleDeleteClick = (assignment: ShiftAssignment) => {
     setAssignmentToDelete(assignment);
     setDeleteDialogOpen(true);
   };
 
-  if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const handleDeleteConfirm = async () => {
+    if (assignmentToDelete) {
+      await deleteAssignment(assignmentToDelete.id);
+      setDeleteDialogOpen(false);
+      setAssignmentToDelete(null);
+    }
+  };
 
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
+  const handleSubmit = async () => {
+    if (selectedDate && selectedEmployee && selectedShift) {
+      await addAssignment({
+        date: selectedDate.toISOString(),
+        employeeId: selectedEmployee,
+        shiftId: selectedShift.id,
+        status: 'pending',
+      });
+      handleCloseDialog();
+    }
+  };
+
+  const getAssignmentsForShiftAndDate = (shiftId: string, date: Date) => {
+    return assignments.filter(
+      (assignment) =>
+        assignment.shiftId === shiftId &&
+        isSameDay(new Date(assignment.date), date)
     );
-  }
+  };
+
+  const getEmployeeName = (employeeId: string) => {
+    const employee = employees.find((e) => e.id === employeeId);
+    return employee?.name || 'Unknown Employee';
+  };
+
+  const handleCellClick = (event: React.MouseEvent<HTMLElement>, date: Date, shift: Shift) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedCell({ date, shift });
+  };
+
+  const handlePopoverClose = () => {
+    setAnchorEl(null);
+    setSelectedCell(null);
+  };
+
+  const open = Boolean(anchorEl);
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Shift-Based Calendar</Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <IconButton onClick={handlePreviousWeek}>
-            <ChevronLeftIcon />
-          </IconButton>
-          <Typography variant="h6" component="span" sx={{ mx: 2 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+            Shift-Based Calendar
+          </Typography>
+          <Typography variant="subtitle1" color="text.secondary">
             {format(weekStart, 'MMMM d')} - {format(addDays(weekStart, 6), 'MMMM d, yyyy')}
           </Typography>
-          <IconButton onClick={handleNextWeek}>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton onClick={handlePreviousWeek} size="large">
+            <ChevronLeftIcon />
+          </IconButton>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog(new Date())}
+          >
+            Add Assignment
+          </Button>
+          <IconButton onClick={handleNextWeek} size="large">
             <ChevronRightIcon />
           </IconButton>
         </Box>
       </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer 
+        component={Paper} 
+        sx={{ 
+          mt: 2,
+          maxHeight: 'calc(100vh - 200px)',
+          overflow: 'auto',
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+        }}
+      >
+        <Table 
+          size="small" 
+          stickyHeader
+          sx={{
+            borderCollapse: 'separate',
+            borderSpacing: 0,
+          }}
+        >
           <TableHead>
             <TableRow>
-              <TableCell sx={{ width: 200 }}>Shift</TableCell>
-              {weekDays.map((day) => (
-                <TableCell key={day.toString()} align="center">
-                  {format(day, 'EEE, MMM d')}
+              <TableCell 
+                sx={{ 
+                  width: 150, 
+                  backgroundColor: 'background.default',
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 2,
+                  borderRight: '2px solid',
+                  borderColor: 'divider',
+                  borderBottom: '2px solid',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <TimeIcon color="primary" fontSize="small" />
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Shift
+                  </Typography>
+                </Box>
+              </TableCell>
+              {weekDays.map((day, index) => (
+                <TableCell 
+                  key={day.toString()} 
+                  align="center" 
+                  sx={{ 
+                    backgroundColor: 'background.default',
+                    minWidth: 120,
+                    borderRight: index < weekDays.length - 1 ? '2px solid' : 'none',
+                    borderColor: 'divider',
+                    borderBottom: '2px solid',
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
+                    {format(day, 'EEE')}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {format(day, 'MMM d')}
+                  </Typography>
                 </TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            {sortedShifts.map((shift) => (
+            {shifts.map((shift, index) => (
               <TableRow key={shift.id}>
-                <TableCell component="th" scope="row">
+                <TableCell 
+                  component="th" 
+                  scope="row" 
+                  sx={{ 
+                    backgroundColor: 'background.default',
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 1,
+                    borderRight: '2px solid',
+                    borderColor: 'divider',
+                    borderBottom: index < shifts.length - 1 ? '2px solid' : 'none',
+                  }}
+                >
                   <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                       {shift.name}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary">
                       {shift.startTime} - {shift.endTime}
                     </Typography>
+                    <Chip
+                      label={`${shift.requiredEmployees} required`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      sx={{ mt: 0.5 }}
+                    />
                   </Box>
                 </TableCell>
-                {weekDays.map((day) => {
-                  const dayAssignments = getAssignmentsForDay(day, shift.id);
+                {weekDays.map((day, dayIndex) => {
+                  const dayAssignments = getAssignmentsForShiftAndDate(shift.id, day);
                   return (
                     <TableCell
                       key={`${day.toString()}-${shift.id}`}
+                      onClick={(e) => handleCellClick(e, day, shift)}
                       sx={{
-                        height: 100,
+                        height: 180,
+                        backgroundColor: 'background.paper',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                        },
                         position: 'relative',
-                        borderRight: '1px solid rgba(224, 224, 224, 1)',
-                        borderBottom: '1px solid rgba(224, 224, 224, 1)',
-                        backgroundColor: shift.color || '#f5f5f5',
+                        p: 0,
+                        borderRight: dayIndex < weekDays.length - 1 ? '2px solid' : 'none',
+                        borderColor: 'divider',
+                        borderBottom: index < shifts.length - 1 ? '2px solid' : 'none',
                       }}
                     >
-                      <Box sx={{ p: 1 }}>
-                        <Stack spacing={1}>
-                          {dayAssignments.map((assignment) => {
-                            const employee = employees.find((e) => e.id === assignment.employeeId);
-                            return (
-                              <Box
-                                key={assignment.id}
-                                sx={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                                  p: 1,
-                                  borderRadius: 1,
+                      <Box 
+                        sx={{ 
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          p: 1.5,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 1,
+                        }}
+                      >
+                        <Box 
+                          sx={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center',
+                            flexShrink: 0,
+                            pb: 1,
+                            borderBottom: '1px solid',
+                            borderColor: 'divider',
+                          }}
+                        >
+                          <Chip
+                            label={`${dayAssignments.length}/${shift.requiredEmployees}`}
+                            size="small"
+                            color={dayAssignments.length >= shift.requiredEmployees ? 'success' : 'warning'}
+                          />
+                          <Tooltip title="Add assignment">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenDialog(day, shift);
+                              }}
+                              sx={{ color: 'primary.main' }}
+                            >
+                              <AddIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+
+                        <Box 
+                          sx={{ 
+                            flex: 1,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 0.75,
+                            minHeight: 0,
+                          }}
+                        >
+                          {dayAssignments.slice(0, 3).map((assignment) => (
+                            <Box
+                              key={assignment.id}
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                p: 1,
+                                borderRadius: 0.75,
+                                backgroundColor: 'background.default',
+                                flexShrink: 0,
+                                minHeight: 32,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                              }}
+                            >
+                              <Box 
+                                sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 1,
+                                  minWidth: 0,
                                 }}
                               >
-                                <Typography variant="body2">
-                                  {employee?.name || 'Unknown Employee'}
+                                <PersonIcon color="primary" fontSize="small" />
+                                <Typography 
+                                  variant="body2" 
+                                  noWrap
+                                  sx={{ 
+                                    maxWidth: '120px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}
+                                >
+                                  {getEmployeeName(assignment.employeeId)}
                                 </Typography>
+                              </Box>
+                              <Tooltip title="Delete assignment">
                                 <IconButton
                                   size="small"
-                                  onClick={() => handleDeleteAssignment(assignment)}
-                                  sx={{ ml: 1 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteClick(assignment);
+                                  }}
+                                  sx={{ 
+                                    color: 'error.main',
+                                    p: 0.5,
+                                    flexShrink: 0,
+                                  }}
                                 >
                                   <DeleteIcon fontSize="small" />
                                 </IconButton>
-                              </Box>
-                            );
-                          })}
-                          <Button
-                            size="small"
-                            startIcon={<AddIcon />}
-                            onClick={() => handleAddAssignment(shift.id, day)}
-                            sx={{ mt: 1 }}
-                          >
-                            Add Assignment
-                          </Button>
-                        </Stack>
+                              </Tooltip>
+                            </Box>
+                          ))}
+                          {dayAssignments.length > 3 && (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                p: 1,
+                                borderRadius: 0.75,
+                                backgroundColor: 'background.default',
+                                cursor: 'pointer',
+                                minHeight: 32,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                '&:hover': {
+                                  backgroundColor: 'action.hover',
+                                },
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCellClick(e, day, shift);
+                              }}
+                            >
+                              <Typography variant="body2" color="primary">
+                                View all {dayAssignments.length} assignments
+                              </Typography>
+                            </Box>
+                          )}
+                          {dayAssignments.length === 0 && (
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                p: 1,
+                                borderRadius: 0.75,
+                                backgroundColor: 'background.default',
+                                height: '100%',
+                                minHeight: 32,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                              }}
+                            >
+                              <Typography variant="body2" color="text.secondary">
+                                No assignments
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
                       </Box>
                     </TableCell>
                   );
@@ -232,16 +437,71 @@ const ShiftBasedCalendar: React.FC = () => {
         </Table>
       </TableContainer>
 
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={handlePopoverClose}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        {selectedCell && (
+          <Box sx={{ p: 2, maxWidth: 300 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <InfoIcon color="primary" />
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                {format(selectedCell.date, 'EEEE, MMMM d')}
+              </Typography>
+            </Box>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              {selectedCell.shift.name} ({selectedCell.shift.startTime} - {selectedCell.shift.endTime})
+            </Typography>
+            <Divider sx={{ my: 1 }} />
+            <List dense>
+              {getAssignmentsForShiftAndDate(selectedCell.shift.id, selectedCell.date).map((assignment) => (
+                <ListItem key={assignment.id}>
+                  <ListItemIcon>
+                    <PersonIcon color="primary" fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={getEmployeeName(assignment.employeeId)}
+                    secondary={assignment.status}
+                  />
+                </ListItem>
+              ))}
+            </List>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              fullWidth
+              sx={{ mt: 2 }}
+              onClick={() => {
+                handlePopoverClose();
+                handleOpenDialog(selectedCell.date, selectedCell.shift);
+              }}
+            >
+              Add Assignment
+            </Button>
+          </Box>
+        )}
+      </Popover>
+
       <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Shift Assignment</DialogTitle>
+        <DialogTitle>Add Assignment</DialogTitle>
         <DialogContent>
-          <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Stack spacing={3} sx={{ mt: 2 }}>
             <FormControl fullWidth>
               <InputLabel>Employee</InputLabel>
               <Select
-                value={formData.employeeId}
+                value={selectedEmployee}
+                onChange={(e) => setSelectedEmployee(e.target.value)}
                 label="Employee"
-                onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
               >
                 {employees.map((employee) => (
                   <MenuItem key={employee.id} value={employee.id}>
@@ -250,59 +510,39 @@ const ShiftBasedCalendar: React.FC = () => {
                 ))}
               </Select>
             </FormControl>
-            <FormControl fullWidth>
-              <InputLabel>Shift</InputLabel>
-              <Select
-                value={formData.shiftId}
-                label="Shift"
-                onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
-                disabled
-              >
-                {shifts.map((shift) => (
-                  <MenuItem key={shift.id} value={shift.id}>
-                    {shift.name} ({shift.startTime} - {shift.endTime})
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+
             <TextField
-              fullWidth
               label="Date"
-              value={formData.date}
-              disabled
+              type="date"
+              value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+              onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+              fullWidth
+              InputLabelProps={{ shrink: true }}
             />
-          </Box>
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSaveAssignment} variant="contained">
-            Save
+          <Button
+            variant="contained"
+            onClick={handleSubmit}
+            disabled={!selectedEmployee || !selectedDate}
+          >
+            Add Assignment
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Delete Assignment</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete this shift assignment?
+            Are you sure you want to delete this assignment? This action cannot be undone.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
-          <Button
-            onClick={() => {
-              if (assignmentToDelete) {
-                deleteAssignment(assignmentToDelete.id);
-                setDeleteDialogOpen(false);
-                setAssignmentToDelete(null);
-              }
-            }}
-            color="error"
-          >
+          <Button onClick={handleDeleteConfirm} color="error" variant="contained">
             Delete
           </Button>
         </DialogActions>
