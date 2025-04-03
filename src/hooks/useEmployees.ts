@@ -4,7 +4,7 @@ import { Employee } from '../types';
 import { checkEmployeeAvailability } from '../utils/shiftUtils';
 
 export function useEmployees() {
-  const { state, dispatch } = useAppContext();
+  const { state, dispatch, roles } = useAppContext();
 
   const addEmployee = useCallback(
     (employee: Employee) => {
@@ -60,7 +60,11 @@ export function useEmployees() {
 
   const getEmployeesByRole = useCallback(
     (role: string) => {
-      return state.employees.filter((employee) => employee.role === role);
+      return state.employees.filter((employee) => 
+        Array.isArray(employee.role) 
+          ? employee.role.includes(role)
+          : employee.role === role
+      );
     },
     [state.employees]
   );
@@ -72,10 +76,15 @@ export function useEmployees() {
         (employee) =>
           employee.name.toLowerCase().includes(lowercaseQuery) ||
           employee.email.toLowerCase().includes(lowercaseQuery) ||
-          employee.role.toLowerCase().includes(lowercaseQuery)
+          (Array.isArray(employee.role) 
+            ? employee.role.some(roleId => {
+                const role = roles.find(r => r.id === roleId);
+                return role?.name.toLowerCase().includes(lowercaseQuery);
+              })
+            : employee.role.toLowerCase().includes(lowercaseQuery))
       );
     },
-    [state.employees]
+    [state.employees, roles]
   );
 
   return {

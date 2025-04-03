@@ -30,6 +30,7 @@ import {
   Schedule as TimeCalendarIcon,
   Notifications as NotificationsIcon,
   Settings as SettingsIcon,
+  Work as WorkIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -51,6 +52,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { text: 'Employees', icon: <PeopleIcon />, path: '/employees' },
     { text: 'Shifts', icon: <ShiftIcon />, path: '/shifts' },
     { text: 'Schedules', icon: <ScheduleIcon />, path: '/schedules' },
+    { text: 'Roles', icon: <WorkIcon />, path: '/roles' },
   ];
 
   const handleDrawerToggle = () => {

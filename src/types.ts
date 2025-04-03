@@ -1,3 +1,9 @@
+export interface ShiftRole {
+  roleId: string;
+  count: number;
+  duration: number;
+}
+
 export interface Shift {
   id: string;
   name: string;
@@ -7,22 +13,33 @@ export interface Shift {
   requiredEmployees: number;
   color: string;
   isOvernight: boolean;
+  roles: ShiftRole[];  // Array of roles with their counts and durations
 }
 
 export interface Employee {
   id: string;
   name: string;
+  role: string | string[];  // Changed to support both single role and multiple roles
   email: string;
   phone: string;
-  role: string;
   availability: Record<string, AvailabilityDay>;
+  preferences: {
+    preferredShifts: string[];
+    preferredDays: string[];
+    maxHoursPerWeek: number;
+    minHoursPerWeek: number;
+  };
+  skills: string[];
+  notes: string;
   color: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface AvailabilityDay {
+  start: string;
+  end: string;
   isClosed: boolean;
-  startTime?: string;
-  endTime?: string;
 }
 
 export interface ShiftAssignment {
@@ -80,4 +97,12 @@ export interface EmployeeInsights {
     };
   };
   lastUpdated: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  icon: string;  // Material-UI icon name
+  color: string;
+  description?: string;
 } 

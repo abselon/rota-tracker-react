@@ -19,14 +19,14 @@ export const checkEmployeeAvailability = (
 
   const availabilityStart = new Date(shiftStart);
   availabilityStart.setHours(
-    parseInt(dayAvailability.startTime?.split(':')[0] ?? '0'),
-    parseInt(dayAvailability.startTime?.split(':')[1] ?? '0')
+    parseInt(dayAvailability.start?.split(':')[0] ?? '0'),
+    parseInt(dayAvailability.start?.split(':')[1] ?? '0')
   );
 
   const availabilityEnd = new Date(shiftEnd);
   availabilityEnd.setHours(
-    parseInt(dayAvailability.endTime?.split(':')[0] ?? '23'),
-    parseInt(dayAvailability.endTime?.split(':')[1] ?? '59')
+    parseInt(dayAvailability.end?.split(':')[0] ?? '23'),
+    parseInt(dayAvailability.end?.split(':')[1] ?? '59')
   );
 
   return isOverlapping(shiftStart, shiftEnd, availabilityStart, availabilityEnd);
@@ -96,4 +96,15 @@ export const getShiftStatus = (assignment: ShiftAssignment): 'scheduled' | 'in-p
   if (now < shiftStart) return 'scheduled';
   if (now > shiftEnd) return 'completed';
   return 'in-progress';
+};
+
+export const hasRequiredRole = (employee: Employee, shift: Shift): boolean => {
+  // If shift has no roles defined, allow assignment
+  if (!shift.roles || shift.roles.length === 0) return true;
+
+  // Check if employee has any of the required roles
+  return shift.roles.some(shiftRole => {
+    const employeeRoles = Array.isArray(employee.role) ? employee.role : [employee.role];
+    return employeeRoles.includes(shiftRole.roleId);
+  });
 }; 

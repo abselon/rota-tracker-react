@@ -29,6 +29,10 @@ import {
   Tabs,
   Tab,
   LinearProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -44,23 +48,48 @@ import {
   TrendingUp as TrendingUpIcon,
   DateRange as DateRangeIcon,
   Close as CloseIcon,
+  Business as BusinessIcon,
+  School as SchoolIcon,
+  LocalHospital as HospitalIcon,
+  Restaurant as RestaurantIcon,
+  Store as StoreIcon,
+  Security as SecurityIcon,
+  Engineering as EngineeringIcon,
+  Science as ScienceIcon,
+  AccountBalance as AccountBalanceIcon,
+  SportsEsports as SportsEsportsIcon,
 } from '@mui/icons-material';
 import { useAppContext } from '../context/AppContext';
-import { Employee, AvailabilityDay, EmployeeInsights, ShiftAssignment } from '../types';
+import { Employee, AvailabilityDay, EmployeeInsights, ShiftAssignment, Role } from '../types';
 import { generateUniqueColor, isColorTooSimilar } from '../utils/colorUtils';
 import { SketchPicker } from 'react-color';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isBefore, isAfter, parseISO } from 'date-fns';
 
 // Initialize default availability for each day of the week
 const defaultAvailability: Record<string, AvailabilityDay> = {
-  monday: { isClosed: false, startTime: '09:00', endTime: '17:00' },
-  tuesday: { isClosed: false, startTime: '09:00', endTime: '17:00' },
-  wednesday: { isClosed: false, startTime: '09:00', endTime: '17:00' },
-  thursday: { isClosed: false, startTime: '09:00', endTime: '17:00' },
-  friday: { isClosed: false, startTime: '09:00', endTime: '17:00' },
-  saturday: { isClosed: true },
-  sunday: { isClosed: true },
+  monday: { start: '09:00', end: '17:00', isClosed: false },
+  tuesday: { start: '09:00', end: '17:00', isClosed: false },
+  wednesday: { start: '09:00', end: '17:00', isClosed: false },
+  thursday: { start: '09:00', end: '17:00', isClosed: false },
+  friday: { start: '09:00', end: '17:00', isClosed: false },
+  saturday: { start: '00:00', end: '00:00', isClosed: true },
+  sunday: { start: '00:00', end: '00:00', isClosed: true },
 };
+
+// Predefined set of commonly used icons
+const availableIcons = [
+  { name: 'Work', component: WorkIcon },
+  { name: 'Business', component: BusinessIcon },
+  { name: 'School', component: SchoolIcon },
+  { name: 'Hospital', component: HospitalIcon },
+  { name: 'Restaurant', component: RestaurantIcon },
+  { name: 'Store', component: StoreIcon },
+  { name: 'Security', component: SecurityIcon },
+  { name: 'Engineering', component: EngineeringIcon },
+  { name: 'Science', component: ScienceIcon },
+  { name: 'Account Balance', component: AccountBalanceIcon },
+  { name: 'Sports', component: SportsEsportsIcon },
+];
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -87,9 +116,26 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+interface FormData {
+  name: string;
+  roles: string[];
+  email: string;
+  phone: string;
+  availability: Record<string, AvailabilityDay>;
+  preferences: {
+    preferredShifts: string[];
+    preferredDays: string[];
+    maxHoursPerWeek: number;
+    minHoursPerWeek: number;
+  };
+  skills: string[];
+  notes: string;
+  color: string;
+}
+
 const EmployeeManagement: React.FC = () => {
   const theme = useTheme();
-  const { state, addEmployee, updateEmployee, deleteEmployee } = useAppContext();
+  const { state, addEmployee, updateEmployee, deleteEmployee, roles } = useAppContext();
   const { employees, isLoading, error, shifts, assignments } = state;
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -101,13 +147,21 @@ const EmployeeManagement: React.FC = () => {
     start: startOfWeek(new Date()),
     end: endOfWeek(new Date()),
   });
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     name: '',
+    roles: [],
     email: '',
-    role: '',
     phone: '',
     availability: defaultAvailability,
-    color: generateUniqueColor(employees.map(emp => emp.color)),
+    preferences: {
+      preferredShifts: [],
+      preferredDays: [],
+      maxHoursPerWeek: 40,
+      minHoursPerWeek: 20,
+    },
+    skills: [],
+    notes: '',
+    color: generateUniqueColor([]),
   });
   const [selectedEmployeeForDetails, setSelectedEmployeeForDetails] = useState<Employee | null>(null);
   const [detailsViewTab, setDetailsViewTab] = useState(0);
@@ -117,39 +171,57 @@ const EmployeeManagement: React.FC = () => {
       setSelectedEmployee(employee);
       setFormData({
         name: employee.name,
+        roles: Array.isArray(employee.role) ? employee.role : [employee.role],
         email: employee.email,
-        role: employee.role,
         phone: employee.phone,
         availability: employee.availability || defaultAvailability,
+        preferences: employee.preferences,
+        skills: employee.skills,
+        notes: employee.notes,
         color: employee.color,
       });
     } else {
       setSelectedEmployee(null);
       setFormData({
         name: '',
+        roles: [],
         email: '',
-        role: '',
         phone: '',
         availability: defaultAvailability,
-        color: generateUniqueColor(employees.map(emp => emp.color)),
+        preferences: {
+          preferredShifts: [],
+          preferredDays: [],
+          maxHoursPerWeek: 40,
+          minHoursPerWeek: 20,
+        },
+        skills: [],
+        notes: '',
+        color: generateUniqueColor(employees.map(e => e.color)),
       });
     }
-    setFormError(null);
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setSelectedEmployee(null);
-    setFormError(null);
     setFormData({
       name: '',
+      roles: [],
       email: '',
-      role: '',
       phone: '',
       availability: defaultAvailability,
-      color: generateUniqueColor(employees.map(emp => emp.color)),
+      preferences: {
+        preferredShifts: [],
+        preferredDays: [],
+        maxHoursPerWeek: 40,
+        minHoursPerWeek: 20,
+      },
+      skills: [],
+      notes: '',
+      color: generateUniqueColor(employees.map(e => e.color)),
     });
+    setFormError(null);
   };
 
   const handleColorPickerOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -175,43 +247,32 @@ const EmployeeManagement: React.FC = () => {
     handleColorPickerClose();
   };
 
-  const validateForm = () => {
-    if (!formData.name.trim()) {
-      setFormError('Name is required');
-      return false;
-    }
-    if (!formData.email.trim()) {
-      setFormError('Email is required');
-      return false;
-    }
-    if (!formData.role.trim()) {
-      setFormError('Role is required');
-      return false;
-    }
-    return true;
-  };
-
   const handleSaveEmployee = async () => {
-    if (!validateForm()) return;
-    
     try {
-      // Ensure availability is properly structured
+      setFormError(null);
+      
+      if (!formData.name || !formData.roles.length || !formData.email) {
+        setFormError('Please fill in all required fields');
+        return;
+      }
+
       const employeeData = {
         ...formData,
-        availability: formData.availability || defaultAvailability
+        role: formData.roles,
+        createdAt: selectedEmployee ? selectedEmployee.createdAt : new Date(),
+        updatedAt: new Date(),
       };
-      
+
       if (selectedEmployee) {
-        // Update existing employee
         await updateEmployee(selectedEmployee.id, employeeData);
       } else {
-        // Add new employee
         await addEmployee(employeeData);
       }
+      
       handleCloseDialog();
-    } catch (err) {
-      console.error('Error saving employee:', err);
-      setFormError('Failed to save employee. Please try again.');
+    } catch (error) {
+      console.error('Error saving employee:', error);
+      setFormError('Failed to save employee');
     }
   };
 
@@ -775,7 +836,7 @@ const EmployeeManagement: React.FC = () => {
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <WorkIcon color="primary" fontSize="small" />
-                  <Typography>Role</Typography>
+                  <Typography>Roles</Typography>
                 </Box>
               </TableCell>
               <TableCell sx={{ 
@@ -847,18 +908,27 @@ const EmployeeManagement: React.FC = () => {
                   <TableCell sx={{ py: 2 }}>{employee.email}</TableCell>
                   <TableCell sx={{ py: 2 }}>{employee.phone}</TableCell>
                   <TableCell sx={{ py: 2 }}>
-                    <Chip 
-                      label={employee.role}
-                      size="small"
-                      sx={{ 
-                        backgroundColor: 'primary.main',
-                        color: 'white',
-                        fontWeight: 500,
-                        '&:hover': {
-                          backgroundColor: 'primary.dark',
-                        }
-                      }}
-                    />
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {(Array.isArray(employee.role) ? employee.role : [employee.role]).map((roleId) => {
+                        const role = roles.find(r => r.id === roleId);
+                        if (!role) return null;
+                        return (
+                          <Chip 
+                            key={roleId}
+                            label={role.name}
+                            size="small"
+                            sx={{ 
+                              backgroundColor: role.color || 'primary.main',
+                              color: 'white',
+                              fontWeight: 500,
+                              '&:hover': {
+                                backgroundColor: role.color ? `${role.color}dd` : 'primary.dark',
+                              }
+                            }}
+                          />
+                        );
+                      })}
+                    </Box>
                   </TableCell>
                   <TableCell sx={{ py: 2 }}>
                     <Box
@@ -916,12 +986,19 @@ const EmployeeManagement: React.FC = () => {
 
       <Dialog 
         open={openDialog} 
-        onClose={handleCloseDialog}
-        maxWidth="sm"
+        onClose={handleCloseDialog} 
+        maxWidth="sm" 
         fullWidth
       >
         <DialogTitle>
-          {selectedEmployee ? 'Edit Employee' : 'Add Employee'}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">
+              {selectedEmployee ? 'Edit Employee' : 'Add New Employee'}
+            </Typography>
+            <IconButton onClick={handleCloseDialog} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
         </DialogTitle>
         <DialogContent>
           {formError && (
@@ -929,35 +1006,90 @@ const EmployeeManagement: React.FC = () => {
               {formError}
             </Alert>
           )}
-          <Stack spacing={3} sx={{ pt: 2 }}>
+          <Stack spacing={3} sx={{ mt: 2 }}>
             <TextField
-              fullWidth
               label="Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              fullWidth
               required
             />
+
+            <FormControl fullWidth required>
+              <InputLabel>Roles</InputLabel>
+              <Select
+                multiple
+                value={formData.roles}
+                label="Roles"
+                onChange={(e) => setFormData({ ...formData, roles: e.target.value as string[] })}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((roleId) => {
+                      const role = roles.find(r => r.id === roleId);
+                      if (!role) return null;
+                      return (
+                        <Chip
+                          key={roleId}
+                          label={role.name}
+                          size="small"
+                          sx={{
+                            backgroundColor: role.color || 'primary.main',
+                            color: 'white',
+                            '& .MuiChip-deleteIcon': {
+                              color: 'white',
+                              '&:hover': {
+                                color: 'error.main',
+                              },
+                            },
+                          }}
+                        />
+                      );
+                    })}
+                  </Box>
+                )}
+              >
+                {roles.map((role) => {
+                  const IconComponent = availableIcons.find(icon => icon.name === role.icon)?.component || WorkIcon;
+                  return (
+                    <MenuItem key={role.id} value={role.id}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            backgroundColor: role.color,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <IconComponent sx={{ color: 'white', fontSize: 16 }} />
+                        </Box>
+                        <Typography>{role.name}</Typography>
+                      </Box>
+                    </MenuItem>
+                  );
+                })}
+              </Select>
+            </FormControl>
+
             <TextField
-              fullWidth
               label="Email"
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              fullWidth
               required
             />
+
             <TextField
-              fullWidth
               label="Phone"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-            />
-            <TextField
               fullWidth
-              label="Role"
-              value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              required
             />
+
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Typography>Employee Color:</Typography>
               <Box
@@ -1014,218 +1146,6 @@ const EmployeeManagement: React.FC = () => {
             Save
           </Button>
         </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(selectedEmployeeForDetails)}
-        onClose={handleDetailsViewClose}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '50%',
-                  backgroundColor: selectedEmployeeForDetails?.color || '#e0e0e0',
-                  border: '2px solid',
-                  borderColor: 'divider',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <PersonIcon sx={{ color: 'white', fontSize: 20 }} />
-              </Box>
-              <Box>
-                <Typography variant="h6">{selectedEmployeeForDetails?.name}</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {selectedEmployeeForDetails?.role}
-                </Typography>
-              </Box>
-            </Box>
-            <IconButton onClick={handleDetailsViewClose}>
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-            <Tabs 
-              value={detailsViewTab} 
-              onChange={handleDetailsTabChange}
-              sx={{ px: 0 }}
-            >
-              <Tab 
-                icon={<CalendarMonthIcon />} 
-                label="Upcoming Shifts" 
-                iconPosition="start"
-              />
-              <Tab 
-                icon={<AccessTimeIcon />} 
-                label="Completed Shifts" 
-                iconPosition="start"
-              />
-            </Tabs>
-          </Box>
-
-          {selectedEmployeeForDetails && (
-            <Box>
-              <TabPanel value={detailsViewTab} index={0}>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Shift</TableCell>
-                        <TableCell>Duration</TableCell>
-                        <TableCell>Status</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {assignments
-                        .filter(a => 
-                          a.employeeId === selectedEmployeeForDetails.id && 
-                          isAfter(parseISO(a.date), new Date())
-                        )
-                        .sort((a, b) => {
-                          const shiftA = shifts.find(s => s.id === a.shiftId);
-                          const shiftB = shifts.find(s => s.id === b.shiftId);
-                          if (!shiftA || !shiftB) return 0;
-                          
-                          // First sort by date
-                          const dateCompare = parseISO(a.date).getTime() - parseISO(b.date).getTime();
-                          if (dateCompare !== 0) return dateCompare;
-                          
-                          // If same date, sort by start time
-                          return shiftA.startTime.localeCompare(shiftB.startTime);
-                        })
-                        .map((assignment) => {
-                          const shift = shifts.find(s => s.id === assignment.shiftId);
-                          if (!shift) return null;
-
-                          return (
-                            <TableRow key={assignment.id}>
-                              <TableCell>
-                                <Box>
-                                  <Typography variant="body2">
-                                    {format(parseISO(assignment.date), 'MMM dd, yyyy')}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {shift.startTime} - {shift.endTime}
-                                  </Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Box
-                                    sx={{
-                                      width: 12,
-                                      height: 12,
-                                      borderRadius: '50%',
-                                      backgroundColor: shift.color,
-                                    }}
-                                  />
-                                  <Typography>{shift.name}</Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell>{shift.duration} hrs</TableCell>
-                              <TableCell>
-                                <Chip 
-                                  label={assignment.status}
-                                  size="small"
-                                  color="primary"
-                                  variant="outlined"
-                                />
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </TabPanel>
-
-              <TabPanel value={detailsViewTab} index={1}>
-                <TableContainer>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Shift</TableCell>
-                        <TableCell>Duration</TableCell>
-                        <TableCell>Status</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {assignments
-                        .filter(a => 
-                          a.employeeId === selectedEmployeeForDetails.id && 
-                          isBefore(parseISO(a.date), new Date())
-                        )
-                        .sort((a, b) => {
-                          const shiftA = shifts.find(s => s.id === a.shiftId);
-                          const shiftB = shifts.find(s => s.id === b.shiftId);
-                          if (!shiftA || !shiftB) return 0;
-                          
-                          // First sort by date (descending)
-                          const dateCompare = parseISO(b.date).getTime() - parseISO(a.date).getTime();
-                          if (dateCompare !== 0) return dateCompare;
-                          
-                          // If same date, sort by end time (descending)
-                          return shiftB.endTime.localeCompare(shiftA.endTime);
-                        })
-                        .map((assignment) => {
-                          const shift = shifts.find(s => s.id === assignment.shiftId);
-                          if (!shift) return null;
-
-                          return (
-                            <TableRow key={assignment.id}>
-                              <TableCell>
-                                <Box>
-                                  <Typography variant="body2">
-                                    {format(parseISO(assignment.date), 'MMM dd, yyyy')}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {shift.startTime} - {shift.endTime}
-                                  </Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <Box
-                                    sx={{
-                                      width: 12,
-                                      height: 12,
-                                      borderRadius: '50%',
-                                      backgroundColor: shift.color,
-                                    }}
-                                  />
-                                  <Typography>{shift.name}</Typography>
-                                </Box>
-                              </TableCell>
-                              <TableCell>{shift.duration} hrs</TableCell>
-                              <TableCell>
-                                <Chip 
-                                  label={assignment.status}
-                                  size="small"
-                                  color="success"
-                                  variant="outlined"
-                                />
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </TabPanel>
-            </Box>
-          )}
-        </DialogContent>
       </Dialog>
     </Box>
   );

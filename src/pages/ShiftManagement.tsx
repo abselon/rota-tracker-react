@@ -55,8 +55,10 @@ import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAppContext } from '../context/AppContext';
-import { Shift } from '../types';
+import { Shift, ShiftRole, Employee } from '../types';
 import { SketchPicker } from 'react-color';
+import { format } from 'date-fns';
+import { hasRequiredRole } from '../utils/shiftUtils';
 
 interface FormData {
   name: string;
@@ -66,6 +68,7 @@ interface FormData {
   requiredEmployees: number;
   color: string;
   isOvernight: boolean;
+  roles: ShiftRole[];
 }
 
 interface DayShiftAssignment {
@@ -74,6 +77,7 @@ interface DayShiftAssignment {
   endTime: string;
   isOvernight: boolean;
   nextDayEndTime?: string;
+  shifts?: string[];
 }
 
 interface WeeklyDesign {
@@ -96,8 +100,9 @@ const isOvernightShift = (startTime: string, endTime: string): boolean => {
 
 export default function ShiftManagement() {
   const theme = useTheme();
-  const { state, addShift, updateShift, deleteShift } = useAppContext();
+  const { state, addShift, updateShift, deleteShift, roles } = useAppContext();
   const { shifts, isLoading, error } = state;
+  const employees = state.employees;
   const [open, setOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [colorPickerAnchor, setColorPickerAnchor] = useState<null | HTMLElement>(null);
@@ -111,8 +116,19 @@ export default function ShiftManagement() {
     requiredEmployees: 1,
     color: '#1976d2',
     isOvernight: false,
+    roles: [],
   });
   const [expandedDays, setExpandedDays] = useState<string[]>([]);
+  const [warningMessage, setWarningMessage] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    details?: string;
+  }>({
+    open: false,
+    title: '',
+    message: '',
+  });
 
   // Initialize weekly design if empty
   useEffect(() => {
@@ -123,7 +139,7 @@ export default function ShiftManagement() {
       });
       setWeeklyDesign(initialDesign);
     }
-  }, []);
+  }, [weeklyDesign]);
 
   const parseTimeString = (timeStr: string): Date => {
     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -280,7 +296,6 @@ export default function ShiftManagement() {
             startTime: '00:00',
             endTime: selectedShift.endTime,
             isOvernight: true,
-            // Don't set nextDayEndTime for the next day's portion
           };
           
           return {
@@ -307,10 +322,32 @@ export default function ShiftManagement() {
     };
   };
 
+  const handleAddRole = () => {
+    setFormData(prev => ({
+      ...prev,
+      roles: [...prev.roles, { roleId: '', count: 1, duration: prev.duration }]
+    }));
+  };
+
+  const handleRemoveRole = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      roles: prev.roles.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleRoleChange = (index: number, field: keyof ShiftRole, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      roles: prev.roles.map((role, i) => 
+        i === index ? { ...role, [field]: value } : role
+      )
+    }));
+  };
+
   const handleOpen = (shift?: Shift) => {
     if (shift) {
       setEditingShift(shift);
-      // Create Date objects for the current time with the shift's hours and minutes
       const today = new Date();
       const [startHours, startMinutes] = shift.startTime.split(':').map(Number);
       const [endHours, endMinutes] = shift.endTime.split(':').map(Number);
@@ -329,6 +366,7 @@ export default function ShiftManagement() {
         requiredEmployees: shift.requiredEmployees,
         color: shift.color,
         isOvernight: shift.isOvernight || false,
+        roles: shift.roles || [],
       });
     } else {
       setEditingShift(null);
@@ -340,6 +378,7 @@ export default function ShiftManagement() {
         requiredEmployees: 1,
         color: '#1976d2',
         isOvernight: false,
+        roles: [],
       });
     }
     setOpen(true);
@@ -363,47 +402,25 @@ export default function ShiftManagement() {
     handleColorPickerClose();
   };
 
-  const handleSubmit = async () => {
-    // Calculate if it's an overnight shift based on times
-    const startTimeStr = formData.startTime.toLocaleTimeString('en-US', { 
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: undefined
-    });
-    const endTimeStr = formData.endTime.toLocaleTimeString('en-US', { 
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: undefined
-    });
-
-    // Calculate if it's an overnight shift
-    const calculatedIsOvernight = isOvernightShift(startTimeStr, endTimeStr);
-    
-    // Use either the manually set value or the calculated value
-    const isOvernight = formData.isOvernight || calculatedIsOvernight;
-
-    const newShift: Omit<Shift, 'id'> = {
+  const handleSave = () => {
+    const isOvernight = formData.startTime > formData.endTime;
+    const shiftData = {
       name: formData.name,
-      startTime: startTimeStr,
-      endTime: endTimeStr,
+      startTime: format(formData.startTime, 'HH:mm'),
+      endTime: format(formData.endTime, 'HH:mm'),
       duration: formData.duration,
       requiredEmployees: formData.requiredEmployees,
       color: formData.color,
       isOvernight,
+      roles: formData.roles,
     };
 
-    try {
-      if (editingShift) {
-        await updateShift(editingShift.id, newShift);
-      } else {
-        await addShift(newShift);
-      }
-      handleClose();
-    } catch (error) {
-      console.error('Error saving shift:', error);
+    if (editingShift) {
+      updateShift(editingShift.id, shiftData);
+    } else {
+      addShift(shiftData);
     }
+    handleClose();
   };
 
   const handleDelete = async (shiftId: string) => {
@@ -732,6 +749,31 @@ export default function ShiftManagement() {
     </Box>
   );
 
+  const handleEmployeeAssignment = (e: React.ChangeEvent<HTMLInputElement>, shiftId: string) => {
+    const employeeId = e.target.value;
+    const shift = shifts.find(s => s.id === shiftId);
+    if (!shift) return;
+
+    const employee = employees.find(emp => emp.id === employeeId);
+    if (!employee) return;
+
+    if (!hasRequiredRole(employee, shift)) {
+      setWarningMessage({
+        open: true,
+        title: 'Invalid Role Assignment',
+        message: `Cannot assign ${employee.name} to this shift. Required roles: ${shift.roles.map(r => {
+          const role = roles.find(role => role.id === r.roleId);
+          return role?.name || r.roleId;
+        }).join(', ')}`,
+        details: `Employee ${employee.name} does not have the required role(s) for this shift.`
+      });
+      return;
+    }
+
+    // Proceed with assignment if role check passes
+    // ... rest of your assignment logic ...
+  };
+
   return (
     <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {error && (
@@ -902,6 +944,35 @@ export default function ShiftManagement() {
                           />
                         )}
                       </Box>
+
+                      {shift.roles && shift.roles.length > 0 && (
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                            Required Roles:
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                            {shift.roles.map((role, index) => {
+                              const roleData = roles.find(r => r.id === role.roleId);
+                              if (!roleData) return null;
+                              return (
+                                <Chip
+                                  key={index}
+                                  label={`${roleData.name} (${role.count})`}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: roleData.color,
+                                    color: 'white',
+                                    '&:hover': {
+                                      backgroundColor: roleData.color,
+                                      opacity: 0.9,
+                                    }
+                                  }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        </Box>
+                      )}
                     </Stack>
                   </CardContent>
                 </Card>
@@ -990,6 +1061,95 @@ export default function ShiftManagement() {
             />
 
             <Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle2">
+                  Required Roles
+                </Typography>
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={handleAddRole}
+                  size="small"
+                  variant="outlined"
+                >
+                  Add Role
+                </Button>
+              </Box>
+              <Stack spacing={2}>
+                {formData.roles.map((role, index) => (
+                  <Paper
+                    key={index}
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      borderRadius: 1,
+                      borderColor: 'divider',
+                      backgroundColor: 'background.paper',
+                    }}
+                  >
+                    <Stack spacing={2}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="subtitle2">Role {index + 1}</Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleRemoveRole(index)}
+                          color="error"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Box>
+                      <FormControl fullWidth>
+                        <InputLabel>Select Role</InputLabel>
+                        <Select
+                          value={role.roleId}
+                          label="Select Role"
+                          onChange={(e) => handleRoleChange(index, 'roleId', e.target.value)}
+                        >
+                          {roles.map((r) => (
+                            <MenuItem key={r.id} value={r.id}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Box
+                                  sx={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: '50%',
+                                    backgroundColor: r.color,
+                                  }}
+                                />
+                                {r.name}
+                              </Box>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                          <TextField
+                            label="Count"
+                            type="number"
+                            fullWidth
+                            value={role.count}
+                            onChange={(e) => handleRoleChange(index, 'count', Number(e.target.value))}
+                            inputProps={{ min: 1 }}
+                          />
+                        </Grid>
+                        <Grid item xs={6}>
+                          <TextField
+                            label="Duration (hours)"
+                            type="number"
+                            fullWidth
+                            value={role.duration}
+                            onChange={(e) => handleRoleChange(index, 'duration', Number(e.target.value))}
+                            inputProps={{ min: 0, max: formData.duration }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            </Box>
+
+            <Box>
               <Typography variant="subtitle2" gutterBottom>
                 Shift Color
               </Typography>
@@ -1031,11 +1191,40 @@ export default function ShiftManagement() {
         <DialogActions sx={{ p: 2, pt: 0 }}>
           <Button onClick={handleClose} sx={{ borderRadius: 1 }}>Cancel</Button>
           <Button 
-            onClick={handleSubmit} 
+            onClick={handleSave} 
             variant="contained"
             sx={{ borderRadius: 1 }}
           >
             {editingShift ? 'Update' : 'Add'} Shift
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={warningMessage.open}
+        onClose={() => setWarningMessage(prev => ({ ...prev, open: false }))}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WarningIcon color="warning" />
+            <Typography>{warningMessage.title}</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography>{warningMessage.message}</Typography>
+            {warningMessage.details && (
+              <Typography variant="body2" color="text.secondary">
+                {warningMessage.details}
+              </Typography>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setWarningMessage(prev => ({ ...prev, open: false }))}>
+            OK
           </Button>
         </DialogActions>
       </Dialog>

@@ -12,7 +12,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './config';
-import { Employee, Shift, ShiftAssignment, WeeklySchedule } from '../types';
+import { Employee, Shift, ShiftAssignment, WeeklySchedule, Role } from '../types';
 
 // Employees
 export const getEmployees = async (): Promise<Employee[]> => {
@@ -218,4 +218,36 @@ export const updateWeeklySchedule = async (id: string, schedule: Partial<WeeklyS
 export const deleteWeeklySchedule = async (id: string): Promise<void> => {
   const scheduleRef = doc(db, 'weeklySchedules', id);
   await deleteDoc(scheduleRef);
+};
+
+// Roles
+export const getRoles = async (): Promise<Role[]> => {
+  const rolesCollection = collection(db, 'roles');
+  const roleSnapshot = await getDocs(rolesCollection);
+  return roleSnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  } as Role));
+};
+
+export const addRole = async (role: Omit<Role, 'id'>): Promise<string> => {
+  const rolesCollection = collection(db, 'roles');
+  const docRef = await addDoc(rolesCollection, {
+    ...role,
+    createdAt: serverTimestamp()
+  });
+  return docRef.id;
+};
+
+export const updateRole = async (id: string, role: Partial<Role>): Promise<void> => {
+  const roleRef = doc(db, 'roles', id);
+  await updateDoc(roleRef, {
+    ...role,
+    updatedAt: serverTimestamp()
+  });
+};
+
+export const deleteRole = async (roleId: string): Promise<void> => {
+  const roleRef = doc(db, 'roles', roleId);
+  await deleteDoc(roleRef);
 }; 

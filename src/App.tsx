@@ -11,6 +11,7 @@ import ShiftBasedCalendar from './pages/TimeBasedCalendar';
 import EmployeeManagement from './pages/EmployeeManagement';
 import ShiftManagement from './pages/ShiftManagement';
 import WeeklyScheduleManagement from './pages/WeeklyScheduleManagement';
+import RoleManagement from './pages/RoleManagement';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
               <Route path="/employees" element={<EmployeeManagement />} />
               <Route path="/shifts" element={<ShiftManagement />} />
               <Route path="/schedules" element={<WeeklyScheduleManagement />} />
+              <Route path="/roles" element={<RoleManagement />} />
             </Routes>
           </Layout>
         </Router>

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode, useEffect } from 'react';
-import { Employee, Shift, ShiftAssignment, WeeklySchedule, BusinessHours } from '../types';
+import { Employee, Shift, ShiftAssignment, WeeklySchedule, BusinessHours, Role } from '../types';
 import * as firebaseServices from '../firebase/services';
 
 interface AppState {
@@ -8,6 +8,7 @@ interface AppState {
   assignments: ShiftAssignment[];
   schedules: WeeklySchedule[];
   businessHours: BusinessHours[];
+  roles: Role[];
   isLoading: boolean;
   error: string | null;
 }
@@ -32,7 +33,11 @@ type AppAction =
   | { type: 'UPDATE_SCHEDULE'; payload: WeeklySchedule }
   | { type: 'DELETE_SCHEDULE'; payload: string }
   | { type: 'SET_BUSINESS_HOURS'; payload: BusinessHours[] }
-  | { type: 'UPDATE_BUSINESS_HOURS'; payload: BusinessHours };
+  | { type: 'UPDATE_BUSINESS_HOURS'; payload: BusinessHours }
+  | { type: 'SET_ROLES'; payload: Role[] }
+  | { type: 'ADD_ROLE'; payload: Role }
+  | { type: 'UPDATE_ROLE'; payload: Role }
+  | { type: 'DELETE_ROLE'; payload: string };
 
 const initialState: AppState = {
   employees: [],
@@ -40,6 +45,7 @@ const initialState: AppState = {
   assignments: [],
   schedules: [],
   businessHours: [],
+  roles: [],
   isLoading: true,
   error: null,
 };
@@ -127,6 +133,22 @@ function appReducer(state: AppState, action: AppAction): AppState {
           hours.id === action.payload.id ? action.payload : hours
         ),
       };
+    case 'SET_ROLES':
+      return { ...state, roles: action.payload };
+    case 'ADD_ROLE':
+      return { ...state, roles: [...state.roles, action.payload] };
+    case 'UPDATE_ROLE':
+      return {
+        ...state,
+        roles: state.roles.map((role) =>
+          role.id === action.payload.id ? action.payload : role
+        ),
+      };
+    case 'DELETE_ROLE':
+      return {
+        ...state,
+        roles: state.roles.filter((role) => role.id !== action.payload),
+      };
     default:
       return state;
   }
@@ -147,6 +169,10 @@ interface AppContextType {
   addSchedule: (schedule: Omit<WeeklySchedule, 'id'>) => Promise<void>;
   updateSchedule: (id: string, schedule: Partial<WeeklySchedule>) => Promise<void>;
   deleteSchedule: (id: string) => Promise<void>;
+  addRole: (role: Omit<Role, 'id'>) => Promise<void>;
+  updateRole: (id: string, role: Partial<Role>) => Promise<void>;
+  deleteRole: (id: string) => Promise<void>;
+  roles: Role[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -161,12 +187,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'SET_LOADING', payload: true });
         
         // Load all data in parallel
-        const [employees, shifts, assignments, schedules, businessHours] = await Promise.all([
+        const [employees, shifts, assignments, schedules, businessHours, roles] = await Promise.all([
           firebaseServices.getEmployees(),
           firebaseServices.getShifts(),
           firebaseServices.getShiftAssignments(),
           firebaseServices.getWeeklySchedules(),
-          Promise.resolve([]) // Business hours not implemented in Firebase yet
+          Promise.resolve([]), // Business hours not implemented in Firebase yet
+          firebaseServices.getRoles()
         ]);
         
         dispatch({ type: 'SET_EMPLOYEES', payload: employees });
@@ -174,6 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'SET_ASSIGNMENTS', payload: assignments });
         dispatch({ type: 'SET_SCHEDULES', payload: schedules });
         dispatch({ type: 'SET_BUSINESS_HOURS', payload: businessHours });
+        dispatch({ type: 'SET_ROLES', payload: roles });
         
         dispatch({ type: 'SET_LOADING', payload: false });
       } catch (error) {
@@ -336,6 +364,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const addRole = async (role: Omit<Role, 'id'>) => {
+    try {
+      const id = await firebaseServices.addRole(role);
+      dispatch({ type: 'ADD_ROLE', payload: { ...role, id } as Role });
+    } catch (error) {
+      console.error('Error adding role:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to add role' });
+    }
+  };
+
+  const updateRole = async (id: string, role: Partial<Role>) => {
+    try {
+      await firebaseServices.updateRole(id, role);
+      dispatch({ type: 'UPDATE_ROLE', payload: { ...role, id } as Role });
+    } catch (error) {
+      console.error('Error updating role:', error);
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to update role' });
+    }
+  };
+
+  const deleteRole = async (roleId: string) => {
+    try {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      await firebaseServices.deleteRole(roleId);
+      
+      // Remove role from state
+      dispatch({ type: 'DELETE_ROLE', payload: roleId });
+      
+      // Update employees that had this role to have no role
+      const employeesWithRole = state.employees.filter(
+        (employee) => employee.role === roleId
+      );
+      employeesWithRole.forEach((employee) => {
+        dispatch({ type: 'UPDATE_EMPLOYEE', payload: { ...employee, role: '' } });
+      });
+      
+      dispatch({ type: 'SET_LOADING', payload: false });
+    } catch (error) {
+      dispatch({ type: 'SET_ERROR', payload: 'Failed to delete role' });
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
   return (
     <AppContext.Provider 
       value={{ 
@@ -352,7 +423,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteAssignment,
         addSchedule,
         updateSchedule,
-        deleteSchedule
+        deleteSchedule,
+        addRole,
+        updateRole,
+        deleteRole,
+        roles: state.roles
       }}
     >
       {children}
