@@ -176,6 +176,7 @@ export default function ShiftManagement() {
       ...prev,
       [day]: [...prev[day], newAssignment],
     }));
+    setExpandedDays(prev => [...prev, day]);
   };
 
   const handleRemoveShiftFromDay = (day: string, index: number) => {
