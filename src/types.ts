@@ -26,10 +26,11 @@ export interface AvailabilityDay {
 
 export interface ShiftAssignment {
   id: string;
+  date: string; // Assuming date is stored as a string
   employeeId: string;
   shiftId: string;
-  date: string; // ISO date string
-  status: 'pending' | 'completed' | 'cancelled';
+  status: string;
+  color?: string; // Add this line to include color
 }
 
 export interface WeeklySchedule {

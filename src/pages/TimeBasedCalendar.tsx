@@ -234,9 +234,10 @@ const ShiftBasedCalendar: React.FC = () => {
                     borderRight: '2px solid',
                     borderColor: 'divider',
                     borderBottom: index < shifts.length - 1 ? '2px solid' : 'none',
+                    p: 2,
                   }}
                 >
-                  <Box>
+                  <Box sx={{ p: 1, border: '1px solid #e0e0e0', borderRadius: 1, backgroundColor: 'background.paper' }}>
                     <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                       {shift.name}
                     </Typography>
@@ -324,29 +325,36 @@ const ShiftBasedCalendar: React.FC = () => {
                             minHeight: 0,
                           }}
                         >
-                          {dayAssignments.slice(0, 3).map((assignment) => (
-                            <Box
-                              key={assignment.id}
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                p: 1,
-                                borderRadius: 0.75,
-                                backgroundColor: 'background.default',
-                                flexShrink: 0,
-                                minHeight: 32,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                              }}
-                            >
-                              <Box 
-                                sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: 1,
-                                  minWidth: 0,
-                                }}
+                          {dayAssignments.length > 2 ? (
+                            <>
+                              {dayAssignments.slice(0, 2).map((assignment) => (
+                                <Box
+                                  key={assignment.id}
+                                  sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                                >
+                                  <PersonIcon color="primary" fontSize="small" />
+                                  <Typography 
+                                    variant="body2" 
+                                    noWrap
+                                    sx={{ 
+                                      maxWidth: '120px',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                  >
+                                    {getEmployeeName(assignment.employeeId)}
+                                  </Typography>
+                                </Box>
+                              ))}
+                              <Typography variant="body2" color="text.secondary">
+                                +{dayAssignments.length - 2} more
+                              </Typography>
+                            </>
+                          ) : (
+                            dayAssignments.map((assignment) => (
+                              <Box
+                                key={assignment.id}
+                                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                               >
                                 <PersonIcon color="primary" fontSize="small" />
                                 <Typography 
@@ -361,50 +369,7 @@ const ShiftBasedCalendar: React.FC = () => {
                                   {getEmployeeName(assignment.employeeId)}
                                 </Typography>
                               </Box>
-                              <Tooltip title="Delete assignment">
-                                <IconButton
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteClick(assignment);
-                                  }}
-                                  sx={{ 
-                                    color: 'error.main',
-                                    p: 0.5,
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          ))}
-                          {dayAssignments.length > 3 && (
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                p: 1,
-                                borderRadius: 0.75,
-                                backgroundColor: 'background.default',
-                                cursor: 'pointer',
-                                minHeight: 32,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                '&:hover': {
-                                  backgroundColor: 'action.hover',
-                                },
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCellClick(e, day, shift);
-                              }}
-                            >
-                              <Typography variant="body2" color="primary">
-                                View all {dayAssignments.length} assignments
-                              </Typography>
-                            </Box>
+                            ))
                           )}
                           {dayAssignments.length === 0 && (
                             <Box

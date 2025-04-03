@@ -18,6 +18,8 @@ import {
   TextField,
   CircularProgress,
   Alert,
+  Stack,
+  Popover,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -26,6 +28,8 @@ import {
 } from '@mui/icons-material';
 import { useAppContext } from '../context/AppContext';
 import { Employee, AvailabilityDay } from '../types';
+import { generateUniqueColor, isColorTooSimilar } from '../utils/colorUtils';
+import { SketchPicker } from 'react-color';
 
 // Initialize default availability for each day of the week
 const defaultAvailability: Record<string, AvailabilityDay> = {
@@ -44,13 +48,14 @@ const EmployeeManagement: React.FC = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [colorPickerAnchor, setColorPickerAnchor] = useState<null | HTMLElement>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     role: '',
     phone: '',
     availability: defaultAvailability,
-    color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
+    color: generateUniqueColor(employees.map(emp => emp.color)),
   });
 
   const handleOpenDialog = (employee?: Employee) => {
@@ -72,7 +77,7 @@ const EmployeeManagement: React.FC = () => {
         role: '',
         phone: '',
         availability: defaultAvailability,
-        color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
+        color: generateUniqueColor(employees.map(emp => emp.color)),
       });
     }
     setFormError(null);
@@ -89,8 +94,31 @@ const EmployeeManagement: React.FC = () => {
       role: '',
       phone: '',
       availability: defaultAvailability,
-      color: `#${Math.floor(Math.random()*16777215).toString(16)}`,
+      color: generateUniqueColor(employees.map(emp => emp.color)),
     });
+  };
+
+  const handleColorPickerOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setColorPickerAnchor(event.currentTarget);
+  };
+
+  const handleColorPickerClose = () => {
+    setColorPickerAnchor(null);
+  };
+
+  const handleColorChange = (color: any) => {
+    const newColor = color.hex;
+    const usedColors = employees
+      .filter(emp => emp.id !== selectedEmployee?.id)
+      .map(emp => emp.color);
+
+    if (isColorTooSimilar(newColor, usedColors)) {
+      setFormError('This color is too similar to another employee\'s color. Please choose a different color.');
+      return;
+    }
+
+    setFormData({ ...formData, color: newColor });
+    handleColorPickerClose();
   };
 
   const validateForm = () => {
@@ -221,13 +249,12 @@ const EmployeeManagement: React.FC = () => {
               {formError}
             </Alert>
           )}
-          <Box sx={{ pt: 2 }}>
+          <Stack spacing={3} sx={{ pt: 2 }}>
             <TextField
               fullWidth
               label="Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              sx={{ mb: 2 }}
               required
             />
             <TextField
@@ -236,7 +263,6 @@ const EmployeeManagement: React.FC = () => {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              sx={{ mb: 2 }}
               required
             />
             <TextField
@@ -244,7 +270,6 @@ const EmployeeManagement: React.FC = () => {
               label="Phone"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              sx={{ mb: 2 }}
             />
             <TextField
               fullWidth
@@ -253,7 +278,40 @@ const EmployeeManagement: React.FC = () => {
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               required
             />
-          </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography>Employee Color:</Typography>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 1,
+                  backgroundColor: formData.color,
+                  border: '1px solid #e0e0e0',
+                  cursor: 'pointer',
+                }}
+                onClick={handleColorPickerOpen}
+              />
+              <Popover
+                open={Boolean(colorPickerAnchor)}
+                anchorEl={colorPickerAnchor}
+                onClose={handleColorPickerClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'left',
+                }}
+              >
+                <SketchPicker
+                  color={formData.color}
+                  onChange={handleColorChange}
+                  disableAlpha
+                />
+              </Popover>
+            </Box>
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseDialog}>Cancel</Button>

@@ -5,15 +5,10 @@ import {
   Typography,
   Button,
   IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogContentText,
   DialogActions,
   TextField,
   MenuItem,
@@ -22,29 +17,24 @@ import {
   InputLabel,
   CircularProgress,
   Alert,
-  Tooltip,
-  DialogContentText,
   Stack,
-  Chip,
   Card,
   CardContent,
   Grid,
-  Fade,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
   Add as AddIcon,
-  Delete as DeleteIcon,
-  Edit as EditIcon,
-  Event as EventIcon,
   Person as PersonIcon,
   AccessTime as TimeIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
-import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
+import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
 import { Shift, Employee, ShiftAssignment } from '../types';
-import { formatDate, formatTime } from '../utils/dateUtils';
+import Collapse from '@mui/material/Collapse';
+import { SketchPicker } from 'react-color';
 
 const RotaCalendar: React.FC = () => {
   const { state, addAssignment, deleteAssignment } = useAppContext();
@@ -56,8 +46,11 @@ const RotaCalendar: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<ShiftAssignment | null>(null);
+  const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const getWeekDays = (startDate: Date) => {
+    return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
+  };
 
   const handlePreviousWeek = () => {
     setWeekStart(subWeeks(weekStart, 1));
@@ -111,14 +104,8 @@ const RotaCalendar: React.FC = () => {
     );
   };
 
-  const getEmployeeName = (employeeId: string) => {
-    const employee = employees.find((e) => e.id === employeeId);
-    return employee?.name || 'Unknown Employee';
-  };
-
-  const getShiftName = (shiftId: string) => {
-    const shift = shifts.find((s) => s.id === shiftId);
-    return shift?.name || 'Unknown Shift';
+  const handleExpandClick = (assignmentId: string) => {
+    setExpandedAssignment(expandedAssignment === assignmentId ? null : assignmentId);
   };
 
   if (isLoading) {
@@ -164,82 +151,108 @@ const RotaCalendar: React.FC = () => {
       </Box>
 
       <Grid container spacing={3}>
-        {weekDays.map((day) => {
-          const dayAssignments = getAssignmentsForDate(day);
+        {Array.from({ length: 5 }).map((_, weekIndex) => {
+          const weekStartDate = addWeeks(weekStart, weekIndex);
+          const weekDays = getWeekDays(weekStartDate);
+          const weekRange = `${format(weekStartDate, 'MMMM d')} - ${format(addDays(weekStartDate, 6), 'MMMM d')}`;
+
           return (
-            <Grid item xs={12} md={4} key={day.toString()}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {format(day, 'EEEE, MMMM d')}
-                    </Typography>
-                    <Chip
-                      label={`${dayAssignments.length} assignments`}
-                      size="small"
-                      color={dayAssignments.length > 0 ? 'primary' : 'default'}
-                    />
-                  </Box>
-                  {dayAssignments.length === 0 ? (
-                    <Typography color="text.secondary" align="center" sx={{ py: 2 }}>
-                      No assignments
-                    </Typography>
-                  ) : (
-                    <Stack spacing={2}>
-                      {dayAssignments.map((assignment) => {
-                        const employee = employees.find((e) => e.id === assignment.employeeId);
-                        const shift = shifts.find((s) => s.id === assignment.shiftId);
-                        return (
-                          <Paper
-                            key={assignment.id}
-                            sx={{
-                              p: 2,
-                              backgroundColor: 'background.default',
-                              position: 'relative',
-                              '&:hover': {
-                                backgroundColor: 'action.hover',
-                              },
-                            }}
-                          >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                              <PersonIcon color="primary" fontSize="small" />
-                              <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
-                                {employee?.name || 'Unknown Employee'}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <TimeIcon color="action" fontSize="small" />
-                              <Typography variant="body2" color="text.secondary">
-                                {shift?.name || 'Unknown Shift'}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ position: 'absolute', top: 8, right: 8 }}>
-                              <Tooltip title="Delete assignment">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleDeleteClick(assignment)}
-                                  sx={{ color: 'error.main' }}
+            <Grid container item xs={12} key={weekIndex} spacing={3}>
+              <Grid item xs={12}>
+                <Paper sx={{ padding: 2, backgroundColor: '#f5f5f5', mb: 2 }}>
+                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
+                    Week {weekIndex + 1}: {weekRange}
+                  </Typography>
+                </Paper>
+              </Grid>
+              {weekDays.map((day) => {
+                const dayAssignments = getAssignmentsForDate(day);
+                return (
+                  <Grid item xs={12} sm={3} md={2} key={day.toString()}>
+                    <Card sx={{ height: 180, width: '100%', overflow: 'hidden' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                            {format(day, 'EEE, MMM d')}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <TimeIcon fontSize="small" />
+                            <Typography variant="body2" sx={{ ml: 0.5 }}>
+                              {dayAssignments.length}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        {dayAssignments.length === 0 ? (
+                          <Typography color="text.secondary" align="center" sx={{ py: 1, fontSize: '0.8rem' }}>
+                            No
+                          </Typography>
+                        ) : (
+                          <Stack spacing={1}>
+                            {dayAssignments.map((assignment) => {
+                              const employee = employees.find((e) => e.id === assignment.employeeId);
+                              const shift = shifts.find((s) => s.id === assignment.shiftId);
+                              return (
+                                <Paper
+                                  key={assignment.id}
+                                  sx={{
+                                    p: 1,
+                                    backgroundColor: employee?.color || 'background.default',
+                                    position: 'relative',
+                                    border: '1px solid #e0e0e0',
+                                    borderRadius: 1,
+                                    boxShadow: 1,
+                                    overflow: 'hidden',
+                                  }}
                                 >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Box>
-                          </Paper>
-                        );
-                      })}
-                    </Stack>
-                  )}
-                  <Button
-                    variant="outlined"
-                    startIcon={<AddIcon />}
-                    fullWidth
-                    sx={{ mt: 2 }}
-                    onClick={() => handleOpenDialog(day)}
-                  >
-                    Add Assignment
-                  </Button>
-                </CardContent>
-              </Card>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <PersonIcon color="primary" fontSize="small" />
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                      {employee?.name || 'Unknown'}
+                                    </Typography>
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <TimeIcon color="action" fontSize="small" />
+                                    <Typography variant="body2" color="text.secondary">
+                                      {shift?.name || 'Unknown'}
+                                    </Typography>
+                                  </Box>
+                                  <IconButton
+                                    onClick={() => handleExpandClick(assignment.id)}
+                                    sx={{ position: 'absolute', top: 8, right: 8 }}
+                                  >
+                                    <ExpandMoreIcon
+                                      sx={{
+                                        transform: expandedAssignment === assignment.id ? 'rotate(180deg)' : 'rotate(0deg)',
+                                        transition: 'transform 0.2s ease',
+                                      }}
+                                    />
+                                  </IconButton>
+                                  <Collapse in={expandedAssignment === assignment.id} timeout="auto" unmountOnExit>
+                                    <Box sx={{ mt: 1, p: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                                      <Typography variant="body2" color="text.secondary">
+                                        Additional details about the assignment can go here.
+                                      </Typography>
+                                    </Box>
+                                  </Collapse>
+                                </Paper>
+                              );
+                            })}
+                          </Stack>
+                        )}
+                        <Button
+                          variant="outlined"
+                          startIcon={<AddIcon />}
+                          fullWidth
+                          sx={{ mt: 1 }}
+                          onClick={() => handleOpenDialog(day)}
+                        >
+                          Add
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                );
+              })}
             </Grid>
           );
         })}
@@ -280,6 +293,29 @@ const RotaCalendar: React.FC = () => {
                 {shifts.map((shift) => (
                   <MenuItem key={shift.id} value={shift.id}>
                     {shift.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth>
+              <InputLabel>Color</InputLabel>
+              <Select
+                value={selectedEmployee?.color || ''}
+                onChange={(e) => {
+                  const color = e.target.value;
+                  setSelectedEmployee((prev) => {
+                    if (prev) {
+                      return { ...prev, color };
+                    }
+                    return null;
+                  });
+                }}
+                label="Color"
+              >
+                {['#FF5733', '#33FF57', '#3357FF', '#F1C40F', '#8E44AD'].map((color) => (
+                  <MenuItem key={color} value={color}>
+                    <div style={{ backgroundColor: color, width: '20px', height: '20px', borderRadius: '50%' }} />
                   </MenuItem>
                 ))}
               </Select>
