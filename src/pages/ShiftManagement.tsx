@@ -18,13 +18,29 @@ import {
   IconButton,
   CircularProgress,
   Alert,
+  Stack,
+  Popover,
+  useTheme,
+  Tooltip,
+  Card,
+  CardContent,
+  Grid,
+  Chip,
 } from '@mui/material';
-import { Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import {
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon,
+  AccessTime as AccessTimeIcon,
+  Group as GroupIcon,
+  Palette as PaletteIcon,
+} from '@mui/icons-material';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAppContext } from '../context/AppContext';
 import { Shift } from '../types';
+import { SketchPicker } from 'react-color';
 
 interface FormData {
   name: string;
@@ -32,19 +48,23 @@ interface FormData {
   endTime: Date;
   duration: number;
   requiredEmployees: number;
+  color: string;
 }
 
 export default function ShiftManagement() {
+  const theme = useTheme();
   const { state, addShift, updateShift, deleteShift } = useAppContext();
   const { shifts, isLoading, error } = state;
   const [open, setOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [colorPickerAnchor, setColorPickerAnchor] = useState<null | HTMLElement>(null);
   const [formData, setFormData] = useState<FormData>({
     name: '',
     startTime: new Date(),
     endTime: new Date(),
     duration: 0,
     requiredEmployees: 1,
+    color: '#1976d2',
   });
 
   const parseTimeString = (timeStr: string): Date => {
@@ -67,6 +87,7 @@ export default function ShiftManagement() {
         endTime: parseTimeString(shift.endTime),
         duration: shift.duration,
         requiredEmployees: shift.requiredEmployees,
+        color: shift.color,
       });
     } else {
       setEditingShift(null);
@@ -76,6 +97,7 @@ export default function ShiftManagement() {
         endTime: new Date(),
         duration: 0,
         requiredEmployees: 1,
+        color: '#1976d2',
       });
     }
     setOpen(true);
@@ -86,6 +108,19 @@ export default function ShiftManagement() {
     setEditingShift(null);
   };
 
+  const handleColorPickerOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setColorPickerAnchor(event.currentTarget);
+  };
+
+  const handleColorPickerClose = () => {
+    setColorPickerAnchor(null);
+  };
+
+  const handleColorChange = (color: any) => {
+    setFormData({ ...formData, color: color.hex });
+    handleColorPickerClose();
+  };
+
   const handleSubmit = async () => {
     const newShift: Omit<Shift, 'id'> = {
       name: formData.name,
@@ -93,7 +128,7 @@ export default function ShiftManagement() {
       endTime: formatTime(formData.endTime),
       duration: formData.duration,
       requiredEmployees: formData.requiredEmployees,
-      color: editingShift?.color || `#${Math.floor(Math.random()*16777215).toString(16)}`,
+      color: formData.color,
     };
 
     try {
@@ -118,139 +153,185 @@ export default function ShiftManagement() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ p: 3 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Shift Management
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpen()}
+          sx={{ borderRadius: 2 }}
+        >
+          Add Shift
+        </Button>
+      </Stack>
+
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
-      
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4">Shift Management</Typography>
-        <Button variant="contained" onClick={() => handleOpen()}>
-          Add Shift
-        </Button>
-      </Box>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Start Time</TableCell>
-              <TableCell>End Time</TableCell>
-              <TableCell>Duration (hours)</TableCell>
-              <TableCell>Required Employees</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {shifts.length === 0 ? (
+      <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <TableContainer>
+          <Table>
+            <TableHead>
               <TableRow>
-                <TableCell colSpan={6} align="center">
-                  No shifts found. Add your first shift to get started.
-                </TableCell>
+                <TableCell>Name</TableCell>
+                <TableCell>Start Time</TableCell>
+                <TableCell>End Time</TableCell>
+                <TableCell>Duration</TableCell>
+                <TableCell>Required Employees</TableCell>
+                <TableCell>Color</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
-            ) : (
-              shifts.map((shift) => (
-                <TableRow key={shift.id}>
-                  <TableCell>{shift.name}</TableCell>
-                  <TableCell>{shift.startTime}</TableCell>
-                  <TableCell>{shift.endTime}</TableCell>
-                  <TableCell>{shift.duration}</TableCell>
-                  <TableCell>{shift.requiredEmployees}</TableCell>
-                  <TableCell>
-                    <IconButton onClick={() => handleOpen(shift)}>
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton onClick={() => handleDelete(shift.id)}>
-                      <DeleteIcon />
-                    </IconButton>
+            </TableHead>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <CircularProgress />
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              ) : shifts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    No shifts found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                shifts.map((shift) => (
+                  <TableRow key={shift.id} hover>
+                    <TableCell>{shift.name}</TableCell>
+                    <TableCell>{shift.startTime}</TableCell>
+                    <TableCell>{shift.endTime}</TableCell>
+                    <TableCell>{shift.duration} hours</TableCell>
+                    <TableCell>{shift.requiredEmployees}</TableCell>
+                    <TableCell>
+                      <Box
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 1,
+                          backgroundColor: shift.color,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Tooltip title="Edit">
+                        <IconButton onClick={() => handleOpen(shift)} color="primary">
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton onClick={() => handleDelete(shift.id)} color="error">
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-        <DialogTitle>{editingShift ? 'Edit Shift' : 'Add Shift'}</DialogTitle>
+        <DialogTitle>
+          {editingShift ? 'Edit Shift' : 'Add New Shift'}
+        </DialogTitle>
         <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box>
-                <TextField
-                  fullWidth
-                  label="Shift Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-                <Box sx={{ flex: 1 }}>
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <TimePicker
-                      label="Start Time"
-                      value={formData.startTime}
-                      onChange={(newValue) => {
-                        if (newValue) {
-                          setFormData({ ...formData, startTime: newValue });
-                        }
-                      }}
-                    />
-                  </LocalizationProvider>
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <LocalizationProvider dateAdapter={AdapterDateFns}>
-                    <TimePicker
-                      label="End Time"
-                      value={formData.endTime}
-                      onChange={(newValue) => {
-                        if (newValue) {
-                          setFormData({ ...formData, endTime: newValue });
-                        }
-                      }}
-                    />
-                  </LocalizationProvider>
-                </Box>
-              </Box>
-              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-                <Box sx={{ flex: 1 }}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="Duration (hours)"
-                    value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
+          <Stack spacing={3} sx={{ mt: 2 }}>
+            <TextField
+              label="Shift Name"
+              fullWidth
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+            
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <Grid container spacing={2}>
+                <Grid item xs={6}>
+                  <TimePicker
+                    label="Start Time"
+                    value={formData.startTime}
+                    onChange={(newValue) => setFormData({ ...formData, startTime: newValue || new Date() })}
+                    slotProps={{ textField: { fullWidth: true } }}
                   />
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    label="Required Employees"
-                    value={formData.requiredEmployees}
-                    onChange={(e) => setFormData({ ...formData, requiredEmployees: Number(e.target.value) })}
+                </Grid>
+                <Grid item xs={6}>
+                  <TimePicker
+                    label="End Time"
+                    value={formData.endTime}
+                    onChange={(newValue) => setFormData({ ...formData, endTime: newValue || new Date() })}
+                    slotProps={{ textField: { fullWidth: true } }}
                   />
-                </Box>
-              </Box>
+                </Grid>
+              </Grid>
+            </LocalizationProvider>
+
+            <TextField
+              label="Duration (hours)"
+              type="number"
+              fullWidth
+              value={formData.duration}
+              onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
+            />
+
+            <TextField
+              label="Required Employees"
+              type="number"
+              fullWidth
+              value={formData.requiredEmployees}
+              onChange={(e) => setFormData({ ...formData, requiredEmployees: Number(e.target.value) })}
+            />
+
+            <Box>
+              <Button
+                startIcon={<PaletteIcon />}
+                onClick={handleColorPickerOpen}
+                sx={{ mb: 1 }}
+              >
+                Choose Color
+              </Button>
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 1,
+                  backgroundColor: formData.color,
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              />
+              <Popover
+                open={Boolean(colorPickerAnchor)}
+                anchorEl={colorPickerAnchor}
+                onClose={handleColorPickerClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'left',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'left',
+                }}
+              >
+                <SketchPicker color={formData.color} onChange={handleColorChange} />
+              </Popover>
             </Box>
-          </Box>
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained">
-            Save
+            {editingShift ? 'Update' : 'Add'} Shift
           </Button>
         </DialogActions>
       </Dialog>
