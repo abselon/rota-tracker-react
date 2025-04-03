@@ -21,6 +21,18 @@ import {
   Card,
   CardContent,
   Grid,
+  Tooltip,
+  Skeleton,
+  Divider,
+  Chip,
+  useTheme,
+  useMediaQuery,
+  Popover,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Badge,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
@@ -29,14 +41,25 @@ import {
   Person as PersonIcon,
   AccessTime as TimeIcon,
   ExpandMore as ExpandMoreIcon,
+  Delete as DeleteIcon,
+  Today as TodayIcon,
+  FilterList as FilterIcon,
+  ViewWeek as ViewWeekIcon,
+  ViewDay as ViewDayIcon,
+  Info as InfoIcon,
+  Email as EmailIcon,
+  Phone as PhoneIcon,
+  Work as WorkIcon,
 } from '@mui/icons-material';
-import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay } from 'date-fns';
+import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
 import { Shift, Employee, ShiftAssignment } from '../types';
 import Collapse from '@mui/material/Collapse';
 import { SketchPicker } from 'react-color';
 
 const RotaCalendar: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { state, addAssignment, deleteAssignment } = useAppContext();
   const { employees, shifts, assignments, isLoading, error } = state;
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
@@ -47,6 +70,12 @@ const RotaCalendar: React.FC = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<ShiftAssignment | null>(null);
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
+  const [expandedWeeks, setExpandedWeeks] = useState<number[]>([0]);
+  const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
+  const [assignmentAnchorEl, setAssignmentAnchorEl] = useState<HTMLElement | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<ShiftAssignment | null>(null);
+  const [dayAnchorEl, setDayAnchorEl] = useState<HTMLElement | null>(null);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   const getWeekDays = (startDate: Date) => {
     return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
@@ -88,6 +117,19 @@ const RotaCalendar: React.FC = () => {
 
   const handleSubmit = async () => {
     if (selectedDate && selectedEmployee && selectedShift) {
+      // Check if employee already has this shift on this day
+      const existingAssignment = assignments.find(
+        (assignment) =>
+          assignment.employeeId === selectedEmployee.id &&
+          assignment.shiftId === selectedShift.id &&
+          isSameDay(new Date(assignment.date), selectedDate)
+      );
+
+      if (existingAssignment) {
+        alert('This employee is already assigned to this shift on this day.');
+        return;
+      }
+
       await addAssignment({
         date: selectedDate.toISOString(),
         employeeId: selectedEmployee.id,
@@ -108,151 +150,490 @@ const RotaCalendar: React.FC = () => {
     setExpandedAssignment(expandedAssignment === assignmentId ? null : assignmentId);
   };
 
-  if (isLoading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
-      </Box>
+  const handleWeekExpand = (weekIndex: number) => {
+    setExpandedWeeks(prev => 
+      prev.includes(weekIndex) 
+        ? prev.filter(w => w !== weekIndex)
+        : [...prev, weekIndex]
     );
+  };
+
+  const handleAssignmentClick = (event: React.MouseEvent<HTMLElement>, assignment: ShiftAssignment) => {
+    event.stopPropagation();
+    setAssignmentAnchorEl(event.currentTarget);
+    setSelectedAssignment(assignment);
+  };
+
+  const handleDayClick = (event: React.MouseEvent<HTMLElement>, date: Date) => {
+    event.stopPropagation();
+    setDayAnchorEl(event.currentTarget);
+    setSelectedDay(date);
+  };
+
+  const handleClosePopover = () => {
+    setAssignmentAnchorEl(null);
+    setDayAnchorEl(null);
+    setSelectedAssignment(null);
+    setSelectedDay(null);
+  };
+
+  const LoadingSkeleton = () => (
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+        <Box>
+          <Skeleton variant="text" width={200} height={40} />
+          <Skeleton variant="text" width={150} height={24} />
+        </Box>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Skeleton variant="circular" width={40} height={40} />
+        </Box>
+      </Box>
+      <Grid container spacing={3}>
+        {[1, 2, 3].map((week) => (
+          <Grid item xs={12} key={week}>
+            <Skeleton variant="rectangular" height={200} />
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+  );
+
+  const AssignmentPopover = () => {
+    if (!selectedAssignment) return null;
+
+    const employee = employees.find(e => e.id === selectedAssignment.employeeId);
+    const shift = shifts.find(s => s.id === selectedAssignment.shiftId);
+
+    return (
+      <Popover
+        open={Boolean(assignmentAnchorEl)}
+        anchorEl={assignmentAnchorEl}
+        onClose={handleClosePopover}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <Box sx={{ p: 2, maxWidth: 300 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <PersonIcon color="primary" />
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              {employee?.name}
+            </Typography>
+          </Box>
+          <Divider sx={{ my: 1 }} />
+          <List dense>
+            <ListItem>
+              <ListItemIcon>
+                <WorkIcon color="primary" fontSize="small" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Shift"
+                secondary={shift?.name}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemIcon>
+                <TimeIcon color="primary" fontSize="small" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Time"
+                secondary={`${shift?.startTime} - ${shift?.endTime}`}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemIcon>
+                <EmailIcon color="primary" fontSize="small" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Email"
+                secondary={employee?.email}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemIcon>
+                <PhoneIcon color="primary" fontSize="small" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Phone"
+                secondary={employee?.phone}
+              />
+            </ListItem>
+          </List>
+          <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+            <Button
+              variant="outlined"
+              color="error"
+              size="small"
+              startIcon={<DeleteIcon />}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteClick(selectedAssignment);
+                handleClosePopover();
+              }}
+            >
+              Delete
+            </Button>
+          </Box>
+        </Box>
+      </Popover>
+    );
+  };
+
+  const DayPopover = () => {
+    if (!selectedDay) return null;
+
+    const dayAssignments = getAssignmentsForDate(selectedDay);
+
+    return (
+      <Popover
+        open={Boolean(dayAnchorEl)}
+        anchorEl={dayAnchorEl}
+        onClose={handleClosePopover}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+      >
+        <Box sx={{ p: 2, maxWidth: 400 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <InfoIcon color="primary" />
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              {format(selectedDay, 'EEEE, MMMM d')}
+            </Typography>
+          </Box>
+          <Divider sx={{ my: 1 }} />
+          <List dense>
+            {dayAssignments.map((assignment) => {
+              const employee = employees.find(e => e.id === assignment.employeeId);
+              const shift = shifts.find(s => s.id === assignment.shiftId);
+              return (
+                <ListItem key={assignment.id}>
+                  <ListItemIcon>
+                    <PersonIcon color="primary" fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={employee?.name}
+                    secondary={`${shift?.name} (${shift?.startTime} - ${shift?.endTime})`}
+                  />
+                </ListItem>
+              );
+            })}
+          </List>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<AddIcon />}
+            fullWidth
+            sx={{ mt: 2 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenDialog(selectedDay);
+              handleClosePopover();
+            }}
+          >
+            Add Assignment
+          </Button>
+        </Box>
+      </Popover>
+    );
+  };
+
+  if (isLoading) {
+    return <LoadingSkeleton />;
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-            Employee Calendar
-          </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
-            {format(weekStart, 'MMMM d')} - {format(addDays(weekStart, 6), 'MMMM d, yyyy')}
-          </Typography>
+      <Paper 
+        elevation={0}
+        sx={{ 
+          p: 3, 
+          mb: 4, 
+          background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+          color: 'white',
+          borderRadius: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+              Employee Calendar
+            </Typography>
+            <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+              {format(weekStart, 'MMMM d')} - {format(addDays(weekStart, 6), 'MMMM d, yyyy')}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Tooltip title="Previous Week">
+              <IconButton onClick={handlePreviousWeek} sx={{ color: 'white' }}>
+                <ChevronLeftIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Today">
+              <IconButton onClick={() => setWeekStart(startOfWeek(new Date()))} sx={{ color: 'white' }}>
+                <TodayIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Next Week">
+              <IconButton onClick={handleNextWeek} sx={{ color: 'white' }}>
+                <ChevronRightIcon />
+              </IconButton>
+            </Tooltip>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog(new Date())}
+              sx={{ 
+                backgroundColor: 'white',
+                color: 'primary.main',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                }
+              }}
+            >
+              Add Assignment
+            </Button>
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={handlePreviousWeek} size="large">
-            <ChevronLeftIcon />
-          </IconButton>
+      </Paper>
+
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog(new Date())}
+            startIcon={<ViewWeekIcon />}
+            variant={viewMode === 'week' ? 'contained' : 'outlined'}
+            onClick={() => setViewMode('week')}
           >
-            Add Assignment
+            Week View
           </Button>
-          <IconButton onClick={handleNextWeek} size="large">
-            <ChevronRightIcon />
-          </IconButton>
+          <Button
+            startIcon={<ViewDayIcon />}
+            variant={viewMode === 'day' ? 'contained' : 'outlined'}
+            onClick={() => setViewMode('day')}
+          >
+            Day View
+          </Button>
+          <Button
+            startIcon={<FilterIcon />}
+            variant="outlined"
+          >
+            Filter
+          </Button>
         </Box>
-      </Box>
+      </Paper>
 
       <Grid container spacing={3}>
-        {Array.from({ length: 5 }).map((_, weekIndex) => {
+        {Array.from({ length: viewMode === 'week' ? 5 : 1 }).map((_, weekIndex) => {
           const weekStartDate = addWeeks(weekStart, weekIndex);
           const weekDays = getWeekDays(weekStartDate);
           const weekRange = `${format(weekStartDate, 'MMMM d')} - ${format(addDays(weekStartDate, 6), 'MMMM d')}`;
+          const isExpanded = expandedWeeks.includes(weekIndex);
 
           return (
             <Grid container item xs={12} key={weekIndex} spacing={3}>
               <Grid item xs={12}>
-                <Paper sx={{ padding: 2, backgroundColor: '#f5f5f5', mb: 2 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                    Week {weekIndex + 1}: {weekRange}
-                  </Typography>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 2, 
+                    backgroundColor: 'background.default',
+                    mb: 2,
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                      transform: 'translateY(-2px)',
+                      boxShadow: theme.shadows[2],
+                    }
+                  }}
+                  onClick={() => handleWeekExpand(weekIndex)}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                        Week {weekIndex + 1}: {weekRange}
+                      </Typography>
+                      <Chip 
+                        label={isExpanded ? 'Expanded' : 'Collapsed'} 
+                        size="small" 
+                        color={isExpanded ? 'primary' : 'default'}
+                        variant="outlined"
+                      />
+                    </Box>
+                    <ExpandMoreIcon 
+                      sx={{ 
+                        transform: isExpanded ? 'rotate(180deg)' : 'none',
+                        transition: 'transform 0.2s ease-in-out'
+                      }} 
+                    />
+                  </Box>
                 </Paper>
               </Grid>
-              {weekDays.map((day) => {
-                const dayAssignments = getAssignmentsForDate(day);
-                return (
-                  <Grid item xs={12} sm={3} md={2} key={day.toString()}>
-                    <Card sx={{ height: 180, width: '100%', overflow: 'hidden' }}>
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '0.9rem' }}>
-                            {format(day, 'EEE, MMM d')}
-                          </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <TimeIcon fontSize="small" />
-                            <Typography variant="body2" sx={{ ml: 0.5 }}>
-                              {dayAssignments.length}
-                            </Typography>
-                          </Box>
-                        </Box>
-                        {dayAssignments.length === 0 ? (
-                          <Typography color="text.secondary" align="center" sx={{ py: 1, fontSize: '0.8rem' }}>
-                            No
-                          </Typography>
-                        ) : (
-                          <Stack spacing={1}>
-                            {dayAssignments.map((assignment) => {
-                              const employee = employees.find((e) => e.id === assignment.employeeId);
-                              const shift = shifts.find((s) => s.id === assignment.shiftId);
-                              return (
-                                <Paper
-                                  key={assignment.id}
-                                  sx={{
-                                    p: 1,
-                                    backgroundColor: employee?.color || 'background.default',
-                                    position: 'relative',
-                                    border: '1px solid #e0e0e0',
-                                    borderRadius: 1,
-                                    boxShadow: 1,
-                                    overflow: 'hidden',
+
+              <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                <Grid container spacing={2}>
+                  {weekDays.map((date, dayIndex) => {
+                    const assignments = getAssignmentsForDate(date);
+                    const isCurrentDay = isToday(date);
+
+                    return (
+                      <Grid item xs={12} sm={6} md={4} key={dayIndex}>
+                        <Card 
+                          elevation={0}
+                          sx={{ 
+                            height: 300,
+                            border: '1px solid',
+                            borderColor: isCurrentDay ? 'primary.main' : 'divider',
+                            borderRadius: 2,
+                            transition: 'all 0.2s ease-in-out',
+                            '&:hover': {
+                              boxShadow: theme.shadows[2],
+                            }
+                          }}
+                          onClick={(e) => handleDayClick(e, date)}
+                        >
+                          <CardContent sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                              <Typography 
+                                variant="subtitle1" 
+                                sx={{ 
+                                  fontWeight: 600,
+                                  color: isCurrentDay ? 'primary.main' : 'text.primary'
+                                }}
+                              >
+                                {format(date, 'EEEE, MMMM d')}
+                              </Typography>
+                              <Badge badgeContent={assignments.length} color="primary">
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenDialog(date);
+                                  }}
+                                  sx={{ 
+                                    color: 'primary.main',
+                                    '&:hover': {
+                                      backgroundColor: 'primary.light',
+                                    }
                                   }}
                                 >
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <PersonIcon color="primary" fontSize="small" />
-                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                      {employee?.name || 'Unknown'}
-                                    </Typography>
-                                  </Box>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <TimeIcon color="action" fontSize="small" />
-                                    <Typography variant="body2" color="text.secondary">
-                                      {shift?.name || 'Unknown'}
-                                    </Typography>
-                                  </Box>
-                                  <IconButton
-                                    onClick={() => handleExpandClick(assignment.id)}
-                                    sx={{ position: 'absolute', top: 8, right: 8 }}
-                                  >
-                                    <ExpandMoreIcon
+                                  <AddIcon fontSize="small" />
+                                </IconButton>
+                              </Badge>
+                            </Box>
+
+                            <Box sx={{ flex: 1 }}>
+                              <Stack spacing={1}>
+                                {assignments.slice(0, 2).map((assignment) => {
+                                  const employee = employees.find(e => e.id === assignment.employeeId);
+                                  const shift = shifts.find(s => s.id === assignment.shiftId);
+
+                                  return (
+                                    <Paper
+                                      key={assignment.id}
+                                      elevation={0}
                                       sx={{
-                                        transform: expandedAssignment === assignment.id ? 'rotate(180deg)' : 'rotate(0deg)',
-                                        transition: 'transform 0.2s ease',
+                                        p: 1.5,
+                                        backgroundColor: 'background.paper',
+                                        border: '2px solid',
+                                        borderColor: employee?.color || 'grey.300',
+                                        borderRadius: 1,
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s ease-in-out',
+                                        '&:hover': {
+                                          transform: 'translateY(-1px)',
+                                          boxShadow: theme.shadows[1],
+                                          borderColor: employee?.color || 'primary.main',
+                                        }
                                       }}
-                                    />
-                                  </IconButton>
-                                  <Collapse in={expandedAssignment === assignment.id} timeout="auto" unmountOnExit>
-                                    <Box sx={{ mt: 1, p: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
-                                      <Typography variant="body2" color="text.secondary">
-                                        Additional details about the assignment can go here.
+                                      onClick={(e) => handleAssignmentClick(e, assignment)}
+                                    >
+                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Box>
+                                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                            {employee?.name}
+                                          </Typography>
+                                          <Typography variant="caption" color="text.secondary">
+                                            {shift?.name} ({shift?.startTime} - {shift?.endTime})
+                                          </Typography>
+                                        </Box>
+                                        <Box 
+                                          sx={{ 
+                                            width: 12, 
+                                            height: 12, 
+                                            borderRadius: '50%',
+                                            backgroundColor: employee?.color || 'grey.300',
+                                            ml: 1
+                                          }} 
+                                        />
+                                      </Box>
+                                    </Paper>
+                                  );
+                                })}
+                                {assignments.length > 2 && (
+                                  <Paper
+                                    elevation={0}
+                                    sx={{
+                                      p: 1.5,
+                                      backgroundColor: 'background.paper',
+                                      border: '2px dashed',
+                                      borderColor: 'divider',
+                                      borderRadius: 1,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s ease-in-out',
+                                      '&:hover': {
+                                        borderColor: 'primary.main',
+                                        backgroundColor: 'action.hover',
+                                      }
+                                    }}
+                                    onClick={(e) => handleDayClick(e, date)}
+                                  >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                      <Typography 
+                                        variant="caption" 
+                                        color="text.secondary"
+                                        sx={{ 
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: 0.5,
+                                          '&:hover': {
+                                            color: 'primary.main',
+                                          }
+                                        }}
+                                      >
+                                        <InfoIcon fontSize="small" />
+                                        View {assignments.length - 2} more assignments
                                       </Typography>
                                     </Box>
-                                  </Collapse>
-                                </Paper>
-                              );
-                            })}
-                          </Stack>
-                        )}
-                        <Button
-                          variant="outlined"
-                          startIcon={<AddIcon />}
-                          fullWidth
-                          sx={{ mt: 1 }}
-                          onClick={() => handleOpenDialog(day)}
-                        >
-                          Add
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                );
-              })}
+                                  </Paper>
+                                )}
+                              </Stack>
+                            </Box>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Collapse>
             </Grid>
           );
         })}
@@ -357,6 +738,9 @@ const RotaCalendar: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <AssignmentPopover />
+      <DayPopover />
     </Box>
   );
 };

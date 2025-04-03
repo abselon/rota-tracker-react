@@ -9,6 +9,7 @@ export interface Employee {
   name: string;
   email: string;
   role: string;
+  color?: string;
   availability: {
     [key: number]: DayAvailability;
   };

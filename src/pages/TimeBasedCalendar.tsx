@@ -95,6 +95,19 @@ const ShiftBasedCalendar: React.FC = () => {
 
   const handleSubmit = async () => {
     if (selectedDate && selectedEmployee && selectedShift) {
+      // Check if employee already has this shift on this day
+      const existingAssignment = assignments.find(
+        (assignment) =>
+          assignment.employeeId === selectedEmployee &&
+          assignment.shiftId === selectedShift.id &&
+          isSameDay(new Date(assignment.date), selectedDate)
+      );
+
+      if (existingAssignment) {
+        alert('This employee is already assigned to this shift on this day.');
+        return;
+      }
+
       await addAssignment({
         date: selectedDate.toISOString(),
         employeeId: selectedEmployee,
@@ -118,6 +131,11 @@ const ShiftBasedCalendar: React.FC = () => {
     return employee?.name || 'Unknown Employee';
   };
 
+  const getEmployeeColor = (employeeId: string) => {
+    const employee = employees.find((e) => e.id === employeeId);
+    return employee?.color || '#e0e0e0';
+  };
+
   const handleCellClick = (event: React.MouseEvent<HTMLElement>, date: Date, shift: Shift) => {
     setAnchorEl(event.currentTarget);
     setSelectedCell({ date, shift });
@@ -129,6 +147,111 @@ const ShiftBasedCalendar: React.FC = () => {
   };
 
   const open = Boolean(anchorEl);
+
+  const renderAssignments = (shiftId: string, date: Date) => {
+    const assignments = getAssignmentsForShiftAndDate(shiftId, date);
+    const shift = shifts.find(s => s.id === shiftId);
+    
+    return (
+      <Box sx={{ 
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 0.5,
+        p: 1,
+      }}>
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          mb: 0.5,
+        }}>
+          <Chip
+            label={`${assignments.length}/${shift?.requiredEmployees || 0}`}
+            size="small"
+            color={assignments.length >= (shift?.requiredEmployees || 0) ? 'success' : 'warning'}
+            sx={{ height: 20 }}
+          />
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenDialog(date, shift || undefined);
+            }}
+            sx={{ color: 'primary.main', p: 0.5 }}
+          >
+            <AddIcon fontSize="small" />
+          </IconButton>
+        </Box>
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          gap: 0.5,
+          flex: 1,
+          overflow: 'hidden',
+        }}>
+          {assignments.map((assignment) => (
+            <Box
+              key={assignment.id}
+              sx={{
+                width: '100%',
+                height: 24,
+                borderRadius: 1,
+                backgroundColor: getEmployeeColor(assignment.employeeId),
+                display: 'flex',
+                alignItems: 'center',
+                px: 1,
+                color: '#fff',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                transition: 'filter 0.2s ease-in-out',
+                '&:hover': {
+                  filter: 'brightness(1.1)',
+                },
+              }}
+            >
+              <Box sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {getEmployeeName(assignment.employeeId)}
+              </Box>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteClick(assignment);
+                }}
+                sx={{ 
+                  color: '#fff',
+                  p: 0.5,
+                  ml: 0.5,
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  }
+                }}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Box>
+          ))}
+          {assignments.length === 0 && (
+            <Typography 
+              variant="caption" 
+              color="text.secondary"
+              sx={{ 
+                textAlign: 'center',
+                py: 1,
+                fontStyle: 'italic'
+              }}
+            >
+              No assignments
+            </Typography>
+          )}
+        </Box>
+      </Box>
+    );
+  };
 
   return (
     <Box sx={{ p: 3 }}>
@@ -175,6 +298,7 @@ const ShiftBasedCalendar: React.FC = () => {
           sx={{
             borderCollapse: 'separate',
             borderSpacing: 0,
+            tableLayout: 'fixed',
           }}
         >
           <TableHead>
@@ -204,7 +328,7 @@ const ShiftBasedCalendar: React.FC = () => {
                   align="center" 
                   sx={{ 
                     backgroundColor: 'background.default',
-                    minWidth: 120,
+                    width: 150,
                     borderRight: index < weekDays.length - 1 ? '2px solid' : 'none',
                     borderColor: 'divider',
                     borderBottom: '2px solid',
@@ -235,6 +359,7 @@ const ShiftBasedCalendar: React.FC = () => {
                     borderColor: 'divider',
                     borderBottom: index < shifts.length - 1 ? '2px solid' : 'none',
                     p: 2,
+                    width: 150,
                   }}
                 >
                   <Box sx={{ p: 1, border: '1px solid #e0e0e0', borderRadius: 1, backgroundColor: 'background.paper' }}>
@@ -253,149 +378,28 @@ const ShiftBasedCalendar: React.FC = () => {
                     />
                   </Box>
                 </TableCell>
-                {weekDays.map((day, dayIndex) => {
-                  const dayAssignments = getAssignmentsForShiftAndDate(shift.id, day);
-                  return (
-                    <TableCell
-                      key={`${day.toString()}-${shift.id}`}
-                      onClick={(e) => handleCellClick(e, day, shift)}
-                      sx={{
-                        height: 180,
-                        backgroundColor: 'background.paper',
-                        cursor: 'pointer',
-                        '&:hover': {
-                          backgroundColor: 'action.hover',
-                        },
-                        position: 'relative',
-                        p: 0,
-                        borderRight: dayIndex < weekDays.length - 1 ? '2px solid' : 'none',
-                        borderColor: 'divider',
-                        borderBottom: index < shifts.length - 1 ? '2px solid' : 'none',
-                      }}
-                    >
-                      <Box 
-                        sx={{ 
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          p: 1.5,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 1,
-                        }}
-                      >
-                        <Box 
-                          sx={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center',
-                            flexShrink: 0,
-                            pb: 1,
-                            borderBottom: '1px solid',
-                            borderColor: 'divider',
-                          }}
-                        >
-                          <Chip
-                            label={`${dayAssignments.length}/${shift.requiredEmployees}`}
-                            size="small"
-                            color={dayAssignments.length >= shift.requiredEmployees ? 'success' : 'warning'}
-                          />
-                          <Tooltip title="Add assignment">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenDialog(day, shift);
-                              }}
-                              sx={{ color: 'primary.main' }}
-                            >
-                              <AddIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-
-                        <Box 
-                          sx={{ 
-                            flex: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 0.75,
-                            minHeight: 0,
-                          }}
-                        >
-                          {dayAssignments.length > 2 ? (
-                            <>
-                              {dayAssignments.slice(0, 2).map((assignment) => (
-                                <Box
-                                  key={assignment.id}
-                                  sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                                >
-                                  <PersonIcon color="primary" fontSize="small" />
-                                  <Typography 
-                                    variant="body2" 
-                                    noWrap
-                                    sx={{ 
-                                      maxWidth: '120px',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                    }}
-                                  >
-                                    {getEmployeeName(assignment.employeeId)}
-                                  </Typography>
-                                </Box>
-                              ))}
-                              <Typography variant="body2" color="text.secondary">
-                                +{dayAssignments.length - 2} more
-                              </Typography>
-                            </>
-                          ) : (
-                            dayAssignments.map((assignment) => (
-                              <Box
-                                key={assignment.id}
-                                sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                              >
-                                <PersonIcon color="primary" fontSize="small" />
-                                <Typography 
-                                  variant="body2" 
-                                  noWrap
-                                  sx={{ 
-                                    maxWidth: '120px',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                  }}
-                                >
-                                  {getEmployeeName(assignment.employeeId)}
-                                </Typography>
-                              </Box>
-                            ))
-                          )}
-                          {dayAssignments.length === 0 && (
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                p: 1,
-                                borderRadius: 0.75,
-                                backgroundColor: 'background.default',
-                                height: '100%',
-                                minHeight: 32,
-                                border: '1px solid',
-                                borderColor: 'divider',
-                              }}
-                            >
-                              <Typography variant="body2" color="text.secondary">
-                                No assignments
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-                    </TableCell>
-                  );
-                })}
+                {weekDays.map((day, dayIndex) => (
+                  <TableCell
+                    key={day.toString()}
+                    align="center"
+                    onClick={(e) => handleCellClick(e, day, shift)}
+                    sx={{
+                      cursor: 'pointer',
+                      width: 150,
+                      height: 120,
+                      borderRight: dayIndex < weekDays.length - 1 ? '2px solid' : 'none',
+                      borderColor: 'divider',
+                      borderBottom: index < shifts.length - 1 ? '2px solid' : 'none',
+                      '&:hover': {
+                        backgroundColor: 'action.hover',
+                      },
+                      p: 0,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {renderAssignments(shift.id, day)}
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>

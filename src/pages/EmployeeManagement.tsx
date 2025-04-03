@@ -207,13 +207,14 @@ const EmployeeManagement: React.FC = () => {
               <TableCell>Email</TableCell>
               <TableCell>Phone</TableCell>
               <TableCell>Role</TableCell>
+              <TableCell>Color</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {employees.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
+                <TableCell colSpan={6} align="center">
                   No employees found. Add your first employee to get started.
                 </TableCell>
               </TableRow>
@@ -224,6 +225,18 @@ const EmployeeManagement: React.FC = () => {
                   <TableCell>{employee.email}</TableCell>
                   <TableCell>{employee.phone}</TableCell>
                   <TableCell>{employee.role}</TableCell>
+                  <TableCell>
+                    <Box
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        backgroundColor: employee.color || '#e0e0e0',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    />
+                  </TableCell>
                   <TableCell>
                     <IconButton onClick={() => handleOpenDialog(employee)}>
                       <EditIcon />
