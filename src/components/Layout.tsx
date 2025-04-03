@@ -17,6 +17,8 @@ import {
   Tooltip,
   Divider,
   Badge,
+  Paper,
+  Stack,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -30,7 +32,7 @@ import {
   Settings as SettingsIcon,
 } from '@mui/icons-material';
 
-const drawerWidth = 280;
+const drawerWidth = 260;
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -57,13 +59,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Toolbar sx={{ px: 2 }}>
-        <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 700 }}>
+      <Paper 
+        elevation={0}
+        sx={{ 
+          p: 2.5, 
+          background: '#f8fafc',
+          color: 'text.primary',
+          borderRadius: 0,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            fontWeight: 600,
+            fontSize: '1.1rem',
+            color: '#1e293b',
+          }}
+        >
           ROTA Tracker
         </Typography>
-      </Toolbar>
+      </Paper>
       <Divider />
-      <List sx={{ flex: 1, px: 1 }}>
+      <List sx={{ px: 1, py: 2 }}>
         {menuItems.map((item) => (
           <ListItemButton
             key={item.text}
@@ -74,31 +93,70 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             selected={location.pathname === item.path}
             sx={{
               mb: 0.5,
-              borderRadius: 2,
+              borderRadius: 1.5,
+              transition: 'all 0.2s ease-in-out',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
               '&.Mui-selected': {
-                backgroundColor: 'primary.light',
-                color: 'primary.main',
+                backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                color: '#1976d2',
                 '&:hover': {
-                  backgroundColor: 'primary.light',
+                  backgroundColor: 'rgba(25, 118, 210, 0.12)',
                 },
                 '& .MuiListItemIcon-root': {
-                  color: 'primary.main',
+                  color: '#1976d2',
+                },
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  left: 0,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 3,
+                  height: '40%',
+                  backgroundColor: '#1976d2',
+                  borderRadius: '0 4px 4px 0',
                 },
               },
             }}
           >
-            <ListItemIcon sx={{ minWidth: 40 }}>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
+            <ListItemIcon sx={{ minWidth: 36, color: 'text.secondary' }}>{item.icon}</ListItemIcon>
+            <ListItemText 
+              primary={item.text}
+              primaryTypographyProps={{
+                sx: {
+                  fontSize: '0.875rem',
+                  fontWeight: location.pathname === item.path ? 500 : 400,
+                }
+              }}
+            />
           </ListItemButton>
         ))}
       </List>
       <Divider />
-      <List sx={{ px: 1 }}>
-        <ListItemButton sx={{ borderRadius: 2, mb: 0.5 }}>
-          <ListItemIcon sx={{ minWidth: 40 }}>
+      <List sx={{ px: 1, py: 2 }}>
+        <ListItemButton 
+          sx={{ 
+            borderRadius: 1.5,
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': {
+              backgroundColor: 'rgba(0, 0, 0, 0.04)',
+            },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 36, color: 'text.secondary' }}>
             <SettingsIcon />
           </ListItemIcon>
-          <ListItemText primary="Settings" />
+          <ListItemText 
+            primary="Settings"
+            primaryTypographyProps={{
+              sx: { 
+                fontSize: '0.875rem',
+                fontWeight: 400 
+              }
+            }}
+          />
         </ListItemButton>
       </List>
     </Box>
@@ -129,23 +187,33 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1, fontWeight: 600, fontSize: '1.1rem' }}>
             {menuItems.find((item) => item.path === location.pathname)?.text || 'ROTA Tracker'}
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
             <Tooltip title="Notifications">
-              <IconButton>
+              <IconButton size="small">
                 <Badge badgeContent={3} color="error">
                   <NotificationsIcon />
                 </Badge>
               </IconButton>
             </Tooltip>
             <Tooltip title="Profile">
-              <IconButton>
-                <Avatar sx={{ width: 32, height: 32 }}>U</Avatar>
+              <IconButton size="small">
+                <Avatar 
+                  sx={{ 
+                    width: 32, 
+                    height: 32,
+                    backgroundColor: '#1976d2',
+                    fontWeight: 500,
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  U
+                </Avatar>
               </IconButton>
             </Tooltip>
-          </Box>
+          </Stack>
         </Toolbar>
       </AppBar>
       <Box
@@ -162,7 +230,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              borderRight: '1px solid',
+              borderColor: 'divider',
+            },
           }}
         >
           {drawer}
@@ -171,7 +244,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+            '& .MuiDrawer-paper': { 
+              boxSizing: 'border-box', 
+              width: drawerWidth,
+              borderRight: '1px solid',
+              borderColor: 'divider',
+            },
           }}
           open
         >
