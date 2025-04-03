@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -30,6 +30,8 @@ import {
   ListItemText,
   ListItemIcon,
   Divider,
+  useTheme,
+  Badge,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
@@ -39,13 +41,18 @@ import {
   Person as PersonIcon,
   AccessTime as TimeIcon,
   Info as InfoIcon,
+  Today as TodayIcon,
+  FilterList as FilterIcon,
+  AccessTime as AccessTimeIcon,
+  Schedule as ScheduleIcon,
+  Group as GroupIcon,
 } from '@mui/icons-material';
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
 import { Shift, ShiftAssignment } from '../types';
 
 const ShiftBasedCalendar: React.FC = () => {
-  const { state, addAssignment, deleteAssignment } = useAppContext();
+  const { state, addAssignment, deleteAssignment, dispatch } = useAppContext();
   const { employees, shifts, assignments } = state;
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [openDialog, setOpenDialog] = useState(false);
@@ -56,8 +63,48 @@ const ShiftBasedCalendar: React.FC = () => {
   const [assignmentToDelete, setAssignmentToDelete] = useState<ShiftAssignment | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedCell, setSelectedCell] = useState<{ date: Date; shift: Shift } | null>(null);
+  const theme = useTheme();
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Add this useEffect to load the saved order when the component mounts
+  useEffect(() => {
+    // Only proceed if we have shifts loaded
+    if (shifts.length > 0) {
+      const savedOrder = localStorage.getItem('shiftOrder');
+      if (savedOrder) {
+        const orderIds = JSON.parse(savedOrder);
+        const orderedShifts = orderIds
+          .map((id: string) => shifts.find(shift => shift.id === id))
+          .filter((shift: Shift | undefined): shift is Shift => shift !== undefined);
+        
+        // Add any new shifts that weren't in the saved order
+        const newShifts = shifts.filter(shift => !orderIds.includes(shift.id));
+        const finalOrderedShifts = [...orderedShifts, ...newShifts];
+        
+        // Update the shifts in the context
+        dispatch({ type: 'SET_SHIFTS', payload: finalOrderedShifts });
+      } else {
+        // If no saved order exists, save the current order
+        localStorage.setItem('shiftOrder', JSON.stringify(shifts.map(shift => shift.id)));
+      }
+    }
+  }, [shifts, dispatch]); // Add shifts and dispatch to dependencies
+
+  const handleMoveShift = (index: number, direction: 'up' | 'down') => {
+    const newShifts = [...shifts];
+    if (direction === 'up' && index > 0) {
+      [newShifts[index], newShifts[index - 1]] = [newShifts[index - 1], newShifts[index]];
+    } else if (direction === 'down' && index < shifts.length - 1) {
+      [newShifts[index], newShifts[index + 1]] = [newShifts[index + 1], newShifts[index]];
+    }
+
+    // Save the new order to localStorage
+    localStorage.setItem('shiftOrder', JSON.stringify(newShifts.map(shift => shift.id)));
+    
+    // Update the local state
+    dispatch({ type: 'SET_SHIFTS', payload: newShifts });
+  };
 
   const handlePreviousWeek = () => {
     setWeekStart(subWeeks(weekStart, 1));
@@ -164,24 +211,71 @@ const ShiftBasedCalendar: React.FC = () => {
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center',
-          mb: 0.5,
+          mb: 1,
+          px: 0.5,
         }}>
-          <Chip
-            label={`${assignments.length}/${shift?.requiredEmployees || 0}`}
-            size="small"
-            color={assignments.length >= (shift?.requiredEmployees || 0) ? 'success' : 'warning'}
-            sx={{ height: 20 }}
-          />
-          <IconButton
-            size="small"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenDialog(date, shift || undefined);
-            }}
-            sx={{ color: 'primary.main', p: 0.5 }}
-          >
-            <AddIcon fontSize="small" />
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center',
+              backgroundColor: assignments.length >= (shift?.requiredEmployees || 0) 
+                ? 'success.light' 
+                : 'warning.light',
+              borderRadius: 1,
+              px: 1,
+              py: 0.5,
+              transition: 'all 0.2s ease-in-out',
+              border: '1px solid',
+              borderColor: assignments.length >= (shift?.requiredEmployees || 0)
+                ? 'success.main'
+                : 'warning.main',
+              '&:hover': {
+                backgroundColor: assignments.length >= (shift?.requiredEmployees || 0)
+                  ? 'success.main'
+                  : 'warning.main',
+                color: 'white',
+                transform: 'translateY(-1px)',
+                boxShadow: theme.shadows[1],
+              }
+            }}>
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  fontSize: '0.7rem',
+                }}
+              >
+                <PersonIcon sx={{ fontSize: 14 }} />
+                {assignments.length}/{shift?.requiredEmployees || 0}
+              </Typography>
+            </Box>
+          </Box>
+          <Tooltip title="Add Assignment">
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenDialog(date, shift || undefined);
+              }}
+              sx={{ 
+                color: 'white', 
+                p: 0.5,
+                backgroundColor: 'primary.main',
+                transition: 'all 0.2s ease-in-out',
+                width: 24,
+                height: 24,
+                '&:hover': {
+                  backgroundColor: 'primary.dark',
+                  transform: 'scale(1.1)',
+                }
+              }}
+            >
+              <AddIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Tooltip>
         </Box>
         <Box sx={{ 
           display: 'flex', 
@@ -190,63 +284,132 @@ const ShiftBasedCalendar: React.FC = () => {
           flex: 1,
           overflow: 'hidden',
         }}>
-          {assignments.map((assignment) => (
-            <Box
+          {assignments.slice(0, 6).map((assignment) => (
+            <Paper
               key={assignment.id}
+              elevation={0}
               sx={{
                 width: '100%',
-                height: 24,
+                height: 28,
                 borderRadius: 1,
-                backgroundColor: getEmployeeColor(assignment.employeeId),
+                backgroundColor: 'background.paper',
+                border: '2px solid',
+                borderColor: getEmployeeColor(assignment.employeeId),
                 display: 'flex',
                 alignItems: 'center',
                 px: 1,
-                color: '#fff',
-                fontSize: '0.75rem',
-                fontWeight: 500,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                transition: 'filter 0.2s ease-in-out',
+                transition: 'all 0.2s ease-in-out',
+                position: 'relative',
                 '&:hover': {
-                  filter: 'brightness(1.1)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: theme.shadows[1],
+                  borderColor: getEmployeeColor(assignment.employeeId),
                 },
               }}
             >
-              <Box sx={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {getEmployeeName(assignment.employeeId)}
-              </Box>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteClick(assignment);
-                }}
+              <Box 
                 sx={{ 
-                  color: '#fff',
-                  p: 0.5,
-                  ml: 0.5,
+                  width: 8, 
+                  height: 8, 
+                  borderRadius: '50%',
+                  backgroundColor: getEmployeeColor(assignment.employeeId),
+                  mr: 1,
+                  flexShrink: 0,
+                }} 
+              />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 500,
+                }}
+              >
+                {getEmployeeName(assignment.employeeId)}
+              </Typography>
+              <Tooltip title="Delete Assignment">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteClick(assignment);
+                  }}
+                  sx={{ 
+                    color: 'error.main',
+                    p: 0.5,
+                    ml: 0.5,
+                    '&:hover': {
+                      backgroundColor: 'error.light',
+                    }
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Paper>
+          ))}
+          {assignments.length > 6 && (
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1,
+                backgroundColor: 'background.paper',
+                border: '2px dashed',
+                borderColor: 'divider',
+                borderRadius: 1,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  backgroundColor: 'action.hover',
+                }
+              }}
+              onClick={(e) => shift && handleCellClick(e, date, shift)}
+            >
+              <Typography 
+                variant="caption" 
+                color="text.secondary"
+                sx={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 0.5,
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    color: 'primary.main',
                   }
                 }}
               >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          ))}
+                <InfoIcon fontSize="small" />
+                View {assignments.length - 6} more assignments
+              </Typography>
+            </Paper>
+          )}
           {assignments.length === 0 && (
-            <Typography 
-              variant="caption" 
-              color="text.secondary"
+            <Box 
               sx={{ 
-                textAlign: 'center',
-                py: 1,
-                fontStyle: 'italic'
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                gap: 1,
+                color: 'text.secondary',
               }}
             >
-              No assignments
-            </Typography>
+              <PersonIcon sx={{ fontSize: 24, opacity: 0.5 }} />
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                  opacity: 0.7,
+                }}
+              >
+                No assignments
+              </Typography>
+            </Box>
           )}
         </Box>
       </Box>
@@ -254,42 +417,99 @@ const ShiftBasedCalendar: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-            Shift-Based Calendar
-          </Typography>
-          <Typography variant="subtitle1" color="text.secondary">
-            {format(weekStart, 'MMMM d')} - {format(addDays(weekStart, 6), 'MMMM d, yyyy')}
-          </Typography>
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+      <Paper 
+        elevation={0}
+        sx={{ 
+          p: 3, 
+          mb: 4, 
+          background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+          color: 'white',
+          borderRadius: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+              Shift-Based Calendar
+            </Typography>
+            <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+              {format(weekStart, 'MMMM d')} - {format(addDays(weekStart, 6), 'MMMM d, yyyy')}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Tooltip title="Previous Week">
+              <IconButton onClick={handlePreviousWeek} sx={{ color: 'white' }}>
+                <ChevronLeftIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Today">
+              <IconButton onClick={() => setWeekStart(startOfWeek(new Date()))} sx={{ color: 'white' }}>
+                <TodayIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Next Week">
+              <IconButton onClick={handleNextWeek} sx={{ color: 'white' }}>
+                <ChevronRightIcon />
+              </IconButton>
+            </Tooltip>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog(new Date())}
+              sx={{ 
+                backgroundColor: 'white',
+                color: 'primary.main',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                }
+              }}
+            >
+              Add Assignment
+            </Button>
+          </Box>
         </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={handlePreviousWeek} size="large">
-            <ChevronLeftIcon />
-          </IconButton>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog(new Date())}
-          >
-            Add Assignment
-          </Button>
-          <IconButton onClick={handleNextWeek} size="large">
-            <ChevronRightIcon />
-          </IconButton>
-        </Box>
-      </Box>
+      </Paper>
 
       <TableContainer 
         component={Paper} 
         sx={{ 
           mt: 2,
-          maxHeight: 'calc(100vh - 200px)',
+          height: 'calc(100vh - 200px)',
           overflow: 'auto',
           border: '1px solid',
           borderColor: 'divider',
           borderRadius: 2,
+          boxShadow: theme.shadows[2],
+          position: 'relative',
+          '&::-webkit-scrollbar': {
+            width: '10px',
+            height: '10px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'background.default',
+            borderRadius: '5px',
+            margin: '4px',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: theme.palette.primary.main,
+            borderRadius: '5px',
+            border: '2px solid',
+            borderColor: 'background.default',
+            backgroundClip: 'padding-box',
+            minHeight: '40px',
+            transition: 'all 0.2s ease-in-out',
+            '&:hover': {
+              background: theme.palette.primary.dark,
+              borderColor: 'background.default',
+            },
+            '&:active': {
+              background: theme.palette.primary.dark,
+            },
+          },
+          '&::-webkit-scrollbar-corner': {
+            background: 'background.default',
+          },
         }}
       >
         <Table 
@@ -299,6 +519,9 @@ const ShiftBasedCalendar: React.FC = () => {
             borderCollapse: 'separate',
             borderSpacing: 0,
             tableLayout: 'fixed',
+            '& th, & td': {
+              borderColor: 'divider',
+            },
           }}
         >
           <TableHead>
@@ -313,6 +536,8 @@ const ShiftBasedCalendar: React.FC = () => {
                   borderRight: '2px solid',
                   borderColor: 'divider',
                   borderBottom: '2px solid',
+                  p: 2,
+                  boxShadow: '2px 0 4px rgba(0,0,0,0.05)',
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -332,6 +557,10 @@ const ShiftBasedCalendar: React.FC = () => {
                     borderRight: index < weekDays.length - 1 ? '2px solid' : 'none',
                     borderColor: 'divider',
                     borderBottom: '2px solid',
+                    p: 2,
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    }
                   }}
                 >
                   <Typography variant="subtitle2" sx={{ fontWeight: 500 }}>
@@ -360,22 +589,122 @@ const ShiftBasedCalendar: React.FC = () => {
                     borderBottom: index < shifts.length - 1 ? '2px solid' : 'none',
                     p: 2,
                     width: 150,
+                    boxShadow: '2px 0 4px rgba(0,0,0,0.05)',
+                    height: 160,
                   }}
                 >
-                  <Box sx={{ p: 1, border: '1px solid #e0e0e0', borderRadius: 1, backgroundColor: 'background.paper' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                      {shift.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {shift.startTime} - {shift.endTime}
-                    </Typography>
-                    <Chip
-                      label={`${shift.requiredEmployees} required`}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                      sx={{ mt: 0.5 }}
-                    />
+                  <Box sx={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    {index > 0 && (
+                      <IconButton
+                        size="small"
+                        onClick={() => handleMoveShift(index, 'up')}
+                        sx={{ 
+                          position: 'absolute',
+                          top: 0,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          backgroundColor: 'background.paper',
+                          boxShadow: theme.shadows[1],
+                          width: 24,
+                          height: 24,
+                          '&:hover': {
+                            backgroundColor: 'action.hover',
+                          }
+                        }}
+                      >
+                        <ChevronLeftIcon sx={{ transform: 'rotate(90deg)', fontSize: 20 }} />
+                      </IconButton>
+                    )}
+                    <Paper
+                      elevation={0}
+                      sx={{ 
+                        p: 1.5, 
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        backgroundColor: 'background.paper',
+                        transition: 'all 0.2s ease-in-out',
+                        mt: index > 0 ? 2 : 0,
+                        mb: index < shifts.length - 1 ? 2 : 0,
+                        position: 'relative',
+                        '&:hover': {
+                          boxShadow: theme.shadows[1],
+                          borderColor: 'primary.main',
+                        }
+                      }}
+                    >
+                      <Box sx={{ 
+                        display: 'flex', 
+                        flexDirection: 'column',
+                        gap: 1,
+                      }}>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 0.75,
+                          borderBottom: '1px solid',
+                          borderColor: 'divider',
+                          pb: 0.75,
+                        }}>
+                          <AccessTimeIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                            {shift.name}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 0.75,
+                          pl: 0.5,
+                        }}>
+                          <ScheduleIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                          <Typography variant="caption" color="text.secondary">
+                            {shift.startTime} - {shift.endTime}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          gap: 0.5,
+                          backgroundColor: 'primary.light',
+                          color: 'primary.main',
+                          borderRadius: 1,
+                          px: 0.75,
+                          py: 0.25,
+                          width: 'fit-content',
+                          mx: 'auto',
+                          minWidth: '24px',
+                          height: '20px',
+                        }}>
+                          <GroupIcon sx={{ fontSize: 12 }} />
+                          <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '0.7rem' }}>
+                            {shift.requiredEmployees}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Paper>
+                    {index < shifts.length - 1 && (
+                      <IconButton
+                        size="small"
+                        onClick={() => handleMoveShift(index, 'down')}
+                        sx={{ 
+                          position: 'absolute',
+                          bottom: 0,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          backgroundColor: 'background.paper',
+                          boxShadow: theme.shadows[1],
+                          width: 24,
+                          height: 24,
+                          '&:hover': {
+                            backgroundColor: 'action.hover',
+                          }
+                        }}
+                      >
+                        <ChevronRightIcon sx={{ transform: 'rotate(90deg)', fontSize: 20 }} />
+                      </IconButton>
+                    )}
                   </Box>
                 </TableCell>
                 {weekDays.map((day, dayIndex) => (
@@ -386,7 +715,7 @@ const ShiftBasedCalendar: React.FC = () => {
                     sx={{
                       cursor: 'pointer',
                       width: 150,
-                      height: 120,
+                      height: 160,
                       borderRight: dayIndex < weekDays.length - 1 ? '2px solid' : 'none',
                       borderColor: 'divider',
                       borderBottom: index < shifts.length - 1 ? '2px solid' : 'none',
@@ -395,6 +724,19 @@ const ShiftBasedCalendar: React.FC = () => {
                       },
                       p: 0,
                       overflow: 'hidden',
+                      position: 'relative',
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        pointerEvents: 'none',
+                        opacity: 0.5,
+                      }
                     }}
                   >
                     {renderAssignments(shift.id, day)}
