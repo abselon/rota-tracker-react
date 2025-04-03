@@ -6,6 +6,7 @@ export interface Shift {
   duration: number;
   requiredEmployees: number;
   color: string;
+  isOvernight: boolean;
 }
 
 export interface Employee {
