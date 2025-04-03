@@ -34,6 +34,9 @@ import {
   InputLabel,
   Switch,
   FormControlLabel,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -43,6 +46,10 @@ import {
   Group as GroupIcon,
   Palette as PaletteIcon,
   AddCircle as AddCircleIcon,
+  CalendarMonth as CalendarMonthIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  ExpandMore as ExpandMoreIcon,
 } from '@mui/icons-material';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -105,6 +112,7 @@ export default function ShiftManagement() {
     color: '#1976d2',
     isOvernight: false,
   });
+  const [expandedDays, setExpandedDays] = useState<string[]>([]);
 
   // Initialize weekly design if empty
   useEffect(() => {
@@ -407,141 +415,315 @@ export default function ShiftManagement() {
     }
   };
 
+  const handleAccordionChange = (day: string) => (event: React.SyntheticEvent, isExpanded: boolean) => {
+    setExpandedDays(prev => 
+      isExpanded 
+        ? [...prev, day]
+        : prev.filter(d => d !== day)
+    );
+  };
+
+  const sortShiftsByStartTime = (shifts: DayShiftAssignment[]) => {
+    return [...shifts].sort((a, b) => {
+      const [aHour, aMinute] = a.startTime.split(':').map(Number);
+      const [bHour, bMinute] = b.startTime.split(':').map(Number);
+      
+      if (aHour !== bHour) return aHour - bHour;
+      return aMinute - bMinute;
+    });
+  };
+
   const renderWeeklyDesign = () => (
     <Box sx={{ mt: 4 }}>
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <CalendarMonthIcon color="primary" />
         Weekly Shift Design
       </Typography>
       <Grid container spacing={2}>
         {DAYS_OF_WEEK.map((day, dayIndex) => (
           <Grid item xs={12} md={6} key={day}>
-            <Paper sx={{ p: 2 }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
-                <Typography variant="h6">{day}</Typography>
-                <Button
-                  startIcon={<AddCircleIcon />}
-                  onClick={() => handleAddShiftToDay(day)}
-                  size="small"
+            <Paper 
+              sx={{ 
+                p: 2,
+                background: 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Accordion 
+                expanded={expandedDays.includes(day)}
+                onChange={handleAccordionChange(day)}
+                sx={{ 
+                  background: 'transparent',
+                  boxShadow: 'none',
+                  '&:before': { display: 'none' },
+                }}
+              >
+                <AccordionSummary
+                  expandIcon={<ExpandMoreIcon />}
+                  sx={{ 
+                    minHeight: '48px !important',
+                    '& .MuiAccordionSummary-content': {
+                      margin: '0 !important',
+                    }
+                  }}
                 >
-                  Add Shift
-                </Button>
-              </Stack>
-              
-              <Stack spacing={2}>
-                {weeklyDesign[day].map((assignment, index) => {
-                  const selectedShift = shifts.find(s => s.id === assignment.shiftId);
-                  return (
-                    <Paper 
-                      key={index} 
-                      variant="outlined" 
-                      sx={{ 
-                        p: 2,
-                        borderColor: selectedShift?.isOvernight ? 'primary.main' : undefined,
-                        borderWidth: selectedShift?.isOvernight ? 2 : 1,
-                        backgroundColor: selectedShift?.isOvernight ? 'primary.light' : undefined,
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ width: '100%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'primary.main' }}>
+                        <CalendarMonthIcon sx={{ color: 'primary.main' }} />
+                        {day}
+                      </Typography>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 0.5,
+                          color: 'text.secondary',
+                          backgroundColor: 'background.default',
+                          px: 1,
+                          py: 0.5,
+                          borderRadius: 1,
+                        }}
+                      >
+                        <AccessTimeIcon sx={{ fontSize: 16 }} />
+                        {calculateTotalHours(weeklyDesign[day])}h
+                      </Typography>
+                    </Box>
+                    <Button
+                      startIcon={<AddCircleIcon />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddShiftToDay(day);
                       }}
+                      size="small"
+                      variant="contained"
+                      color="primary"
+                      sx={{ borderRadius: 1 }}
                     >
-                      <Stack spacing={2}>
-                        <FormControl fullWidth size="small">
-                          <InputLabel>Select Shift</InputLabel>
-                          <Select
-                            value={assignment.shiftId}
-                            label="Select Shift"
-                            onChange={(e) => handleShiftAssignmentChange(day, index, 'shiftId', e.target.value)}
-                          >
-                            {shifts.map((shift) => (
-                              <MenuItem key={shift.id} value={shift.id}>
-                                {shift.name} ({shift.startTime} - {shift.endTime})
-                                {shift.isOvernight && ' (Overnight)'}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                        
-                        {selectedShift && (
-                          <>
-                            <Grid container spacing={2}>
-                              <Grid item xs={6}>
-                                <TextField
-                                  label="Start Time"
-                                  type="time"
-                                  value={assignment.startTime}
-                                  fullWidth
-                                  size="small"
-                                  InputProps={{
-                                    readOnly: true,
+                      Add Shift
+                    </Button>
+                  </Stack>
+                </AccordionSummary>
+                <AccordionDetails sx={{ px: 0, pt: 2 }}>
+                  <Stack spacing={1.5}>
+                    {sortShiftsByStartTime(weeklyDesign[day]).map((assignment, index) => {
+                      const selectedShift = shifts.find(s => s.id === assignment.shiftId);
+                      const shiftColor = selectedShift?.color || '#1976d2';
+                      const isOvernight = selectedShift?.isOvernight;
+                      
+                      return (
+                        <Paper 
+                          key={index} 
+                          variant="outlined" 
+                          sx={{ 
+                            p: 1.5,
+                            borderColor: isOvernight ? 'primary.main' : shiftColor,
+                            borderWidth: isOvernight ? 2 : 1,
+                            backgroundColor: 'background.paper',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            transition: 'all 0.2s ease-in-out',
+                            borderRadius: 2,
+                            '&:hover': {
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                              transform: 'translateY(-1px)',
+                              borderColor: isOvernight ? 'primary.dark' : shiftColor,
+                            },
+                            '&::before': {
+                              content: '""',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: 3,
+                              height: '100%',
+                              backgroundColor: shiftColor,
+                              opacity: 0.8,
+                              transition: 'all 0.2s ease-in-out',
+                            },
+                            '&:hover::before': {
+                              opacity: 1,
+                            }
+                          }}
+                        >
+                          <Stack spacing={1}>
+                            {/* Header Section */}
+                            <Box sx={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                            }}>
+                              <FormControl size="small" sx={{ flex: 1, mr: 1 }}>
+                                <Select
+                                  value={assignment.shiftId}
+                                  onChange={(e) => handleShiftAssignmentChange(day, index, 'shiftId', e.target.value)}
+                                  displayEmpty
+                                  sx={{
+                                    '& .MuiOutlinedInput-notchedOutline': {
+                                      borderColor: shiftColor,
+                                      borderRadius: 1,
+                                      transition: 'all 0.2s ease-in-out',
+                                    },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                                      borderColor: shiftColor,
+                                      borderWidth: 2,
+                                    },
+                                    '& .MuiSelect-select': {
+                                      py: 0.5,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 0.5,
+                                    }
                                   }}
-                                  helperText={selectedShift.isOvernight && assignment.startTime === '00:00' 
-                                    ? "Continues from previous day" 
-                                    : "Shift start time"}
-                                />
-                              </Grid>
-                              <Grid item xs={6}>
-                                <TextField
-                                  label="End Time"
-                                  type="time"
-                                  value={assignment.endTime}
-                                  fullWidth
-                                  size="small"
-                                  InputProps={{
-                                    readOnly: true,
-                                  }}
-                                  helperText={selectedShift.isOvernight && assignment.startTime !== '00:00' 
-                                    ? "Until midnight" 
-                                    : "Shift end time"}
-                                />
-                              </Grid>
-                            </Grid>
+                                >
+                                  <MenuItem value="" disabled>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
+                                      <AccessTimeIcon sx={{ fontSize: 16 }} />
+                                      Select Shift
+                                    </Box>
+                                  </MenuItem>
+                                  {shifts.map((shift) => (
+                                    <MenuItem 
+                                      key={shift.id} 
+                                      value={shift.id}
+                                      sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5,
+                                      }}
+                                    >
+                                      <Box
+                                        sx={{
+                                          width: 6,
+                                          height: 6,
+                                          borderRadius: '50%',
+                                          backgroundColor: shift.color,
+                                          border: '1px solid',
+                                          borderColor: 'white',
+                                        }}
+                                      />
+                                      {shift.name}
+                                      {shift.isOvernight && (
+                                        <Chip
+                                          label="Overnight"
+                                          size="small"
+                                          color="primary"
+                                          variant="outlined"
+                                          sx={{ 
+                                            ml: 0.5,
+                                            height: 16,
+                                            '& .MuiChip-label': {
+                                              px: 0.5,
+                                              fontSize: '0.7rem',
+                                            }
+                                          }}
+                                        />
+                                      )}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleRemoveShiftFromDay(day, index)}
+                                sx={{
+                                  '&:hover': {
+                                    backgroundColor: 'error.light',
+                                    color: 'error.dark',
+                                    transform: 'scale(1.1)',
+                                  }
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                            
+                            {selectedShift && (
+                              <Box sx={{ 
+                                display: 'flex', 
+                                flexDirection: 'column',
+                                gap: 0.75,
+                                p: 0.75,
+                                borderRadius: 1,
+                                backgroundColor: `${shiftColor}08`,
+                                transition: 'all 0.2s ease-in-out',
+                                '&:hover': {
+                                  backgroundColor: `${shiftColor}12`,
+                                }
+                              }}>
+                                {/* Time Information */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <AccessTimeIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                    {assignment.startTime} - {assignment.endTime}
+                                  </Typography>
+                                  {selectedShift.isOvernight && (
+                                    <Typography 
+                                      variant="caption" 
+                                      sx={{ 
+                                        color: 'primary.main',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5,
+                                        ml: 'auto',
+                                      }}
+                                    >
+                                      <AccessTimeIcon sx={{ fontSize: 14 }} />
+                                      {assignment.startTime === '00:00' ? 'Continued' : `Until ${assignment.nextDayEndTime}`}
+                                    </Typography>
+                                  )}
+                                </Box>
 
-                            {selectedShift.isOvernight && assignment.startTime !== '00:00' && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Chip 
-                                  label="Overnight Shift" 
-                                  color="primary" 
-                                  size="small"
-                                  icon={<AccessTimeIcon />}
-                                />
-                                <TextField
-                                  label="Next Day End Time"
-                                  type="time"
-                                  value={assignment.nextDayEndTime}
-                                  fullWidth
-                                  size="small"
-                                  InputProps={{
-                                    readOnly: true,
-                                  }}
-                                  helperText="Shift ends on next day"
-                                />
+                                {/* Shift Details */}
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  gap: 0.5,
+                                  flexWrap: 'wrap',
+                                }}>
+                                  <Chip
+                                    icon={<AccessTimeIcon />}
+                                    label={`${selectedShift.duration}h`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ 
+                                      height: 16,
+                                      borderColor: shiftColor,
+                                      color: shiftColor,
+                                      '& .MuiChip-label': {
+                                        px: 0.5,
+                                        fontSize: '0.7rem',
+                                      }
+                                    }}
+                                  />
+                                  <Chip
+                                    icon={<GroupIcon />}
+                                    label={`${selectedShift.requiredEmployees} req`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{ 
+                                      height: 16,
+                                      borderColor: shiftColor,
+                                      color: shiftColor,
+                                      '& .MuiChip-label': {
+                                        px: 0.5,
+                                        fontSize: '0.7rem',
+                                      }
+                                    }}
+                                  />
+                                </Box>
                               </Box>
                             )}
-                          </>
-                        )}
-                        
-                        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleRemoveShiftFromDay(day, index)}
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Box>
-                      </Stack>
-                    </Paper>
-                  );
-                })}
-              </Stack>
-              
-              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="body2" color="text.secondary">
-                  Total Hours: {calculateTotalHours(weeklyDesign[day])}
-                </Typography>
-                <Chip
-                  label={calculateTotalHours(weeklyDesign[day]) === 24 ? "24 Hours" : "Incomplete"}
-                  color={calculateTotalHours(weeklyDesign[day]) === 24 ? "success" : "warning"}
-                  size="small"
-                />
-              </Box>
+                          </Stack>
+                        </Paper>
+                      );
+                    })}
+                  </Stack>
+                </AccordionDetails>
+              </Accordion>
             </Paper>
           </Grid>
         ))}
@@ -550,112 +732,202 @@ export default function ShiftManagement() {
   );
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Shift Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpen()}
-          sx={{ borderRadius: 2 }}
-        >
-          Add Shift
-        </Button>
-      </Stack>
-
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
 
-      <Tabs
-        value={selectedTab}
-        onChange={(_, newValue) => setSelectedTab(newValue)}
-        sx={{ mb: 3 }}
+      <Paper 
+        elevation={0}
+        sx={{ 
+          p: 3, 
+          mb: 4, 
+          background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+          color: 'white',
+          borderRadius: 2,
+        }}
       >
-        <Tab label="Shift Types" />
-        <Tab label="Weekly Design" />
-      </Tabs>
+        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', sm: 'center' }, gap: 2 }}>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+              Shift Management
+            </Typography>
+            <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+              Manage your shift types and weekly schedule design
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpen()}
+            sx={{ 
+              backgroundColor: 'white',
+              color: 'primary.main',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              }
+            }}
+          >
+            Add Shift
+          </Button>
+        </Box>
+      </Paper>
+
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs
+          value={selectedTab}
+          onChange={(_, newValue) => setSelectedTab(newValue)}
+          sx={{ px: 0 }}
+        >
+          <Tab 
+            icon={<AccessTimeIcon />} 
+            label="Shift Types" 
+            iconPosition="start"
+          />
+          <Tab 
+            icon={<CalendarMonthIcon />} 
+            label="Weekly Design" 
+            iconPosition="start"
+          />
+        </Tabs>
+      </Box>
 
       {selectedTab === 0 ? (
-        <Paper elevation={0} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Start Time</TableCell>
-                  <TableCell>End Time</TableCell>
-                  <TableCell>Duration</TableCell>
-                  <TableCell>Required Employees</TableCell>
-                  <TableCell>Overnight</TableCell>
-                  <TableCell>Color</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      <CircularProgress />
-                    </TableCell>
-                  </TableRow>
-                ) : shifts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} align="center">
-                      No shifts found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  shifts.map((shift) => (
-                    <TableRow key={shift.id} hover>
-                      <TableCell>{shift.name}</TableCell>
-                      <TableCell>{shift.startTime}</TableCell>
-                      <TableCell>{shift.endTime}</TableCell>
-                      <TableCell>{shift.duration} hours</TableCell>
-                      <TableCell>{shift.requiredEmployees}</TableCell>
-                      <TableCell>{shift.isOvernight ? 'Yes' : 'No'}</TableCell>
-                      <TableCell>
-                        <Box
-                          sx={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 1,
-                            backgroundColor: shift.color,
-                            border: '1px solid',
-                            borderColor: 'divider',
-                          }}
+        <Grid container spacing={2}>
+          {isLoading ? (
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <CircularProgress />
+              </Box>
+            </Grid>
+          ) : shifts.length === 0 ? (
+            <Grid item xs={12}>
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  p: 4, 
+                  textAlign: 'center',
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                  borderRadius: 2
+                }}
+              >
+                <Typography color="text.secondary">
+                  No shifts found. Click "Add Shift" to create your first shift.
+                </Typography>
+              </Paper>
+            </Grid>
+          ) : (
+            shifts.map((shift) => (
+              <Grid item xs={12} md={6} lg={4} key={shift.id}>
+                <Card 
+                  elevation={0}
+                  sx={{ 
+                    height: '100%',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      boxShadow: theme.shadows[2],
+                      borderColor: 'primary.main',
+                    }
+                  }}
+                >
+                  <CardContent>
+                    <Stack spacing={2}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box
+                            sx={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: '50%',
+                              backgroundColor: shift.color,
+                            }}
+                          />
+                          <Typography variant="h6">{shift.name}</Typography>
+                        </Box>
+                        <Box>
+                          <Tooltip title="Edit">
+                            <IconButton 
+                              onClick={() => handleOpen(shift)} 
+                              color="primary"
+                              size="small"
+                            >
+                              <EditIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete">
+                            <IconButton 
+                              onClick={() => handleDelete(shift.id)} 
+                              color="error"
+                              size="small"
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <AccessTimeIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                        <Typography variant="body2" color="text.secondary">
+                          {shift.startTime} - {shift.endTime}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Chip
+                          label={`${shift.duration} hrs`}
+                          size="small"
+                          variant="outlined"
+                          icon={<AccessTimeIcon />}
                         />
-                      </TableCell>
-                      <TableCell align="right">
-                        <Tooltip title="Edit">
-                          <IconButton onClick={() => handleOpen(shift)} color="primary">
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton onClick={() => handleDelete(shift.id)} color="error">
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+                        <Chip
+                          label={`${shift.requiredEmployees} req.`}
+                          size="small"
+                          variant="outlined"
+                          icon={<GroupIcon />}
+                        />
+                        {shift.isOvernight && (
+                          <Chip
+                            label="Overnight"
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+          )}
+        </Grid>
       ) : (
         renderWeeklyDesign()
       )}
 
-      <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={open} 
+        onClose={handleClose} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
+      >
         <DialogTitle>
-          {editingShift ? 'Edit Shift' : 'Add New Shift'}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {editingShift ? <EditIcon color="primary" /> : <AddIcon color="primary" />}
+            <Typography variant="h6">
+              {editingShift ? 'Edit Shift' : 'Add New Shift'}
+            </Typography>
+          </Box>
         </DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 2 }}>
@@ -664,6 +936,7 @@ export default function ShiftManagement() {
               fullWidth
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
             />
             
             <LocalizationProvider dateAdapter={AdapterDateFns}>
@@ -673,7 +946,12 @@ export default function ShiftManagement() {
                     label="Start Time"
                     value={formData.startTime}
                     onChange={(newValue) => setFormData({ ...formData, startTime: newValue || new Date() })}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    slotProps={{ 
+                      textField: { 
+                        fullWidth: true,
+                        sx: { '& .MuiOutlinedInput-root': { borderRadius: 1 } }
+                      } 
+                    }}
                   />
                 </Grid>
                 <Grid item xs={6}>
@@ -681,7 +959,12 @@ export default function ShiftManagement() {
                     label="End Time"
                     value={formData.endTime}
                     onChange={(newValue) => setFormData({ ...formData, endTime: newValue || new Date() })}
-                    slotProps={{ textField: { fullWidth: true } }}
+                    slotProps={{ 
+                      textField: { 
+                        fullWidth: true,
+                        sx: { '& .MuiOutlinedInput-root': { borderRadius: 1 } }
+                      } 
+                    }}
                   />
                 </Grid>
               </Grid>
@@ -693,6 +976,7 @@ export default function ShiftManagement() {
               fullWidth
               value={formData.duration}
               onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) })}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
             />
 
             <TextField
@@ -701,70 +985,55 @@ export default function ShiftManagement() {
               fullWidth
               value={formData.requiredEmployees}
               onChange={(e) => setFormData({ ...formData, requiredEmployees: Number(e.target.value) })}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
             />
+
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                Shift Color
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 1,
+                    backgroundColor: formData.color,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    cursor: 'pointer',
+                  }}
+                  onClick={handleColorPickerOpen}
+                />
+                <Button
+                  startIcon={<PaletteIcon />}
+                  onClick={handleColorPickerOpen}
+                  variant="outlined"
+                  sx={{ borderRadius: 1 }}
+                >
+                  Choose Color
+                </Button>
+              </Box>
+            </Box>
 
             <FormControlLabel
               control={
                 <Switch
                   checked={formData.isOvernight}
-                  onChange={(e) => {
-                    const newIsOvernight = e.target.checked;
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      isOvernight: newIsOvernight 
-                    }));
-                    
-                    // If manually setting as overnight, adjust the end time to be on the next day
-                    if (newIsOvernight) {
-                      const endDate = new Date(formData.endTime);
-                      endDate.setDate(endDate.getDate() + 1);
-                      setFormData(prev => ({ ...prev, endTime: endDate }));
-                    }
-                  }}
+                  onChange={(e) => setFormData({ ...formData, isOvernight: e.target.checked })}
                 />
               }
               label="Overnight Shift"
             />
-
-            <Box>
-              <Button
-                startIcon={<PaletteIcon />}
-                onClick={handleColorPickerOpen}
-                sx={{ mb: 1 }}
-              >
-                Choose Color
-              </Button>
-              <Box
-                sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 1,
-                  backgroundColor: formData.color,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                }}
-              />
-              <Popover
-                open={Boolean(colorPickerAnchor)}
-                anchorEl={colorPickerAnchor}
-                onClose={handleColorPickerClose}
-                anchorOrigin={{
-                  vertical: 'bottom',
-                  horizontal: 'left',
-                }}
-                transformOrigin={{
-                  vertical: 'top',
-                  horizontal: 'left',
-                }}
-              >
-                <SketchPicker color={formData.color} onChange={handleColorChange} />
-              </Popover>
-            </Box>
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained">
+        <DialogActions sx={{ p: 2, pt: 0 }}>
+          <Button onClick={handleClose} sx={{ borderRadius: 1 }}>Cancel</Button>
+          <Button 
+            onClick={handleSubmit} 
+            variant="contained"
+            sx={{ borderRadius: 1 }}
+          >
             {editingShift ? 'Update' : 'Add'} Shift
           </Button>
         </DialogActions>
