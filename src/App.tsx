@@ -12,6 +12,7 @@ import EmployeeManagement from './pages/EmployeeManagement';
 import ShiftManagement from './pages/ShiftManagement';
 import WeeklyScheduleManagement from './pages/WeeklyScheduleManagement';
 import RoleManagement from './pages/RoleManagement';
+import MasterCalendar from './pages/MasterCalendar';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Layout>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/master-calendar" element={<MasterCalendar />} />
               <Route path="/calendar" element={<RotaCalendar />} />
               <Route path="/shift-calendar" element={<ShiftBasedCalendar />} />
               <Route path="/employees" element={<EmployeeManagement />} />
