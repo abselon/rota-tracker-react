@@ -33,6 +33,7 @@ import {
   useTheme,
   Badge,
   Alert,
+  Avatar,
 } from '@mui/material';
 import {
   ChevronLeft as ChevronLeftIcon,
@@ -52,16 +53,17 @@ import {
 } from '@mui/icons-material';
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
-import { Shift, ShiftAssignment } from '../types';
+import { Shift, ShiftAssignment, Employee } from '../types';
 
 const ShiftBasedCalendar: React.FC = () => {
   const { state, addAssignment, deleteAssignment, dispatch } = useAppContext();
-  const { employees, shifts, assignments } = state;
+  const { employees, shifts, assignments, roles } = state;
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  const [selectedRole, setSelectedRole] = useState<string>('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<ShiftAssignment | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
@@ -129,6 +131,7 @@ const ShiftBasedCalendar: React.FC = () => {
     setSelectedDate(null);
     setSelectedShift(null);
     setSelectedEmployee('');
+    setSelectedRole('');
   };
 
   const handleDeleteClick = (assignment: ShiftAssignment) => {
@@ -157,8 +160,38 @@ const ShiftBasedCalendar: React.FC = () => {
     }
   };
 
+  const getRoleAssignmentsForShiftAndDate = (shiftId: string, date: Date) => {
+    const shiftAssignments = assignments.filter(
+      (assignment) =>
+        assignment.shiftId === shiftId &&
+        isSameDay(new Date(assignment.date), date)
+    );
+
+    // Count how many times each role is assigned
+    const roleCounts: Record<string, number> = {};
+    shiftAssignments.forEach(assignment => {
+      const employee = employees.find(e => e.id === assignment.employeeId);
+      if (!employee) return;
+      
+      const employeeRoles = Array.isArray(employee.role) ? employee.role : [employee.role];
+      employeeRoles.forEach(roleId => {
+        roleCounts[roleId] = (roleCounts[roleId] || 0) + 1;
+      });
+    });
+
+    return roleCounts;
+  };
+
+  const isRoleAvailable = (roleId: string, shift: Shift, date: Date) => {
+    const roleAssignments = getRoleAssignmentsForShiftAndDate(shift.id, date);
+    const shiftRole = shift.roles.find(r => r.roleId === roleId);
+    if (!shiftRole) return false;
+    
+    return (roleAssignments[roleId] || 0) < shiftRole.count;
+  };
+
   const handleSubmit = async () => {
-    if (selectedDate && selectedEmployee && selectedShift) {
+    if (selectedDate && selectedEmployee && selectedShift && selectedRole) {
       try {
         // Check if employee already has this shift on this day
         const existingAssignment = assignments.find(
@@ -173,6 +206,12 @@ const ShiftBasedCalendar: React.FC = () => {
           return;
         }
 
+        // Check if the role is still available
+        if (!isRoleAvailable(selectedRole, selectedShift, selectedDate)) {
+          alert('This role has already been filled for this shift.');
+          return;
+        }
+
         const newAssignment: Omit<ShiftAssignment, 'id'> = {
           date: selectedDate.toISOString(),
           employeeId: selectedEmployee,
@@ -180,7 +219,8 @@ const ShiftBasedCalendar: React.FC = () => {
           startTime: selectedShift.startTime,
           endTime: selectedShift.endTime,
           isOvernight: selectedShift.isOvernight,
-          status: 'pending'
+          status: 'pending',
+          roleId: selectedRole
         };
 
         await addAssignment(newAssignment);
@@ -196,7 +236,8 @@ const ShiftBasedCalendar: React.FC = () => {
     return assignments.filter(
       (assignment) =>
         assignment.shiftId === shiftId &&
-        isSameDay(new Date(assignment.date), date)
+        isSameDay(new Date(assignment.date), date) &&
+        assignment.employeeId
     );
   };
 
@@ -441,6 +482,12 @@ const ShiftBasedCalendar: React.FC = () => {
         </Box>
       </Box>
     );
+  };
+
+  const hasRequiredRole = (employee: Employee, shift: Shift): boolean => {
+    const employeeRoles = Array.isArray(employee.role) ? employee.role : [employee.role];
+    const requiredRoles = shift.roles.map(role => role.roleId);
+    return employeeRoles.some((role: string) => requiredRoles.includes(role));
   };
 
   return (
@@ -703,11 +750,40 @@ const ShiftBasedCalendar: React.FC = () => {
                           mx: 'auto',
                           minWidth: '24px',
                           height: '20px',
+                          cursor: 'pointer',
                         }}>
-                          <GroupIcon sx={{ fontSize: 12 }} />
-                          <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '0.7rem' }}>
-                            {shift.requiredEmployees}
-                          </Typography>
+                          <Tooltip 
+                            title={
+                              <Box sx={{ p: 1 }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>Required Roles:</Typography>
+                                {shift.roles.map((role, index) => {
+                                  const roleData = roles.find(r => r.id === role.roleId);
+                                  return (
+                                    <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                      <Box sx={{ 
+                                        width: 8, 
+                                        height: 8, 
+                                        borderRadius: '50%',
+                                        backgroundColor: roleData?.color || theme.palette.primary.main,
+                                      }} />
+                                      <Typography variant="body2">
+                                        {roleData?.name || role.roleId} ({role.count})
+                                      </Typography>
+                                    </Box>
+                                  );
+                                })}
+                              </Box>
+                            }
+                            arrow
+                            placement="top"
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <GroupIcon sx={{ fontSize: 12 }} />
+                              <Typography variant="caption" sx={{ fontWeight: 500, fontSize: '0.7rem' }}>
+                                {shift.requiredEmployees}
+                              </Typography>
+                            </Box>
+                          </Tooltip>
                         </Box>
                       </Box>
                     </Paper>
@@ -841,13 +917,102 @@ const ShiftBasedCalendar: React.FC = () => {
                 onChange={(e) => setSelectedEmployee(e.target.value)}
                 label="Employee"
               >
-                {employees.map((employee) => (
-                  <MenuItem key={employee.id} value={employee.id}>
-                    {employee.name}
-                  </MenuItem>
-                ))}
+                {employees
+                  .filter(employee => {
+                    if (!selectedShift) return true;
+                    const employeeRoles = Array.isArray(employee.role) ? employee.role : [employee.role];
+                    return selectedShift.roles.some(shiftRole => 
+                      employeeRoles.includes(shiftRole.roleId)
+                    );
+                  })
+                  .map((employee) => {
+                    const employeeRoles = Array.isArray(employee.role) ? employee.role : [employee.role];
+                    const roleData = employeeRoles.map(roleId => roles.find(r => r.id === roleId));
+                    return (
+                      <MenuItem key={employee.id} value={employee.id}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              bgcolor: employee.color || theme.palette.primary.main,
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            {employee.name.charAt(0)}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2">{employee.name}</Typography>
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                              {roleData.map((role, index) => role && (
+                                <Chip
+                                  key={index}
+                                  label={role.name}
+                                  size="small"
+                                  sx={{
+                                    backgroundColor: role.color || theme.palette.primary.main,
+                                    color: 'white',
+                                    height: 20,
+                                    '& .MuiChip-label': {
+                                      px: 0.5,
+                                      fontSize: '0.7rem'
+                                    }
+                                  }}
+                                />
+                              ))}
+                            </Box>
+                          </Box>
+                        </Box>
+                      </MenuItem>
+                    );
+                  })}
               </Select>
             </FormControl>
+
+            {selectedEmployee && selectedShift && (
+              <FormControl fullWidth>
+                <InputLabel>Select Role</InputLabel>
+                <Select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  label="Select Role"
+                >
+                  {(() => {
+                    const employee = employees.find(e => e.id === selectedEmployee);
+                    if (!employee) return null;
+                    
+                    const employeeRoles = Array.isArray(employee.role) ? employee.role : [employee.role];
+                    return selectedShift.roles
+                      .filter(shiftRole => {
+                        // Only show roles that the employee has AND are still available
+                        return employeeRoles.includes(shiftRole.roleId) && 
+                               isRoleAvailable(shiftRole.roleId, selectedShift, selectedDate!);
+                      })
+                      .map((shiftRole) => {
+                        const role = roles.find(r => r.id === shiftRole.roleId);
+                        if (!role) return null;
+                        return (
+                          <MenuItem key={role.id} value={role.id}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box
+                                sx={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: '50%',
+                                  backgroundColor: role.color,
+                                }}
+                              />
+                              <Typography>
+                                {role.name} ({getRoleAssignmentsForShiftAndDate(selectedShift.id, selectedDate!)[role.id] || 0}/{shiftRole.count})
+                              </Typography>
+                            </Box>
+                          </MenuItem>
+                        );
+                      });
+                  })()}
+                </Select>
+              </FormControl>
+            )}
 
             <TextField
               label="Date"

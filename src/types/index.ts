@@ -105,6 +105,7 @@ export interface ShiftAssignment {
   endTime: string;    // HH:mm format
   isOvernight: boolean;
   status: 'pending' | 'confirmed' | 'declined' | 'cancelled' | 'completed';
+  roleId: string;  // The role the employee is assigned to for this shift
   notes?: string;
 }
 

@@ -59,7 +59,7 @@ import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAppContext } from '../context/AppContext';
-import { Shift, ShiftRole, Employee, ShiftAssignment } from '../types';
+import { Shift, ShiftRole, Employee, ShiftAssignment } from '../types/index';
 import { SketchPicker } from 'react-color';
 import { format } from 'date-fns';
 import { hasRequiredRole } from '../utils/shiftUtils';
@@ -986,7 +986,8 @@ export default function ShiftManagement() {
             startTime: assignment.startTime,
             endTime: assignment.isOvernight ? '23:59' : assignment.endTime,
             isOvernight: assignment.isOvernight,
-            status: 'pending'
+            status: 'pending',
+            roleId: shift.roles[0].roleId
           });
 
           // Handle overnight shifts
@@ -1001,7 +1002,8 @@ export default function ShiftManagement() {
               startTime: '00:00',
               endTime: assignment.nextDayEndTime || shift.endTime,
               isOvernight: true,
-              status: 'pending'
+              status: 'pending',
+              roleId: shift.roles[0].roleId
             });
 
             processedOvernightShifts.add(`${assignment.shiftId}-${nextDate.toISOString()}`);

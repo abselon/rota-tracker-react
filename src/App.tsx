@@ -15,6 +15,7 @@ import ShiftManagement from './pages/ShiftManagement';
 import WeeklyScheduleManagement from './pages/WeeklyScheduleManagement';
 import RoleManagement from './pages/RoleManagement';
 import MasterCalendar from './pages/MasterCalendar';
+import RoleBasedCalendar from './pages/RoleBasedCalendar';
 import { AdBlockerAlert } from './components/AdBlockerAlert';
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/master-calendar" element={<MasterCalendar />} />
+                <Route path="/role-calendar" element={<RoleBasedCalendar />} />
                 <Route path="/calendar" element={<RotaCalendar />} />
                 <Route path="/shift-calendar" element={<ShiftBasedCalendar />} />
                 <Route path="/employees" element={<EmployeeManagement />} />

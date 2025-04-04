@@ -55,7 +55,7 @@ import {
 } from '@mui/icons-material';
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
-import { Shift, Employee, ShiftAssignment } from '../types';
+import { Shift, Employee, ShiftAssignment } from '../types/index';
 import Collapse from '@mui/material/Collapse';
 import { SketchPicker } from 'react-color';
 
@@ -154,7 +154,8 @@ const RotaCalendar: React.FC = () => {
           startTime: selectedShift.startTime,
           endTime: selectedShift.endTime,
           isOvernight: selectedShift.isOvernight,
-          status: 'pending'
+          status: 'pending',
+          roleId: selectedShift.roles[0].roleId // Use the first role by default
         };
 
         await addAssignment(newAssignment);
@@ -168,7 +169,8 @@ const RotaCalendar: React.FC = () => {
 
   const getAssignmentsForDate = (date: Date) => {
     return assignments.filter((assignment) =>
-      isSameDay(new Date(assignment.date), date)
+      isSameDay(new Date(assignment.date), date) &&
+      assignment.employeeId // Only include assignments with an employee
     );
   };
 

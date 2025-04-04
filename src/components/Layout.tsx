@@ -32,6 +32,7 @@ import {
   Settings as SettingsIcon,
   Work as WorkIcon,
   CalendarToday as MasterCalendarIcon,
+  Assignment as RoleCalendarIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -49,6 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Master Calendar', icon: <MasterCalendarIcon />, path: '/master-calendar' },
+    { text: 'Role Calendar', icon: <RoleCalendarIcon />, path: '/role-calendar' },
     { text: 'Employee Calendar', icon: <CalendarIcon />, path: '/calendar' },
     { text: 'Shift Calendar', icon: <TimeCalendarIcon />, path: '/shift-calendar' },
     { text: 'Employees', icon: <PeopleIcon />, path: '/employees' },
