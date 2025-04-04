@@ -197,115 +197,118 @@ export default function ShiftManagement() {
 
   const handleRemoveShiftFromDay = (day: string, index: number) => {
     setWeeklyDesign(prev => {
-      const removedShift = prev[day][index];
+      const assignmentToRemove = prev[day][index];
+      const selectedShift = shifts.find(s => s.id === assignmentToRemove.shiftId);
       
-      // If this is a continuation shift (starts at 00:00), we need to remove the originating shift
-      if (removedShift?.isOvernight && removedShift.startTime === '00:00') {
-        const prevDayIndex = DAYS_OF_WEEK.indexOf(day) - 1;
-        const prevDay = prevDayIndex >= 0 
-          ? DAYS_OF_WEEK[prevDayIndex] 
-          : DAYS_OF_WEEK[DAYS_OF_WEEK.length - 1];
+      // If this is an overnight shift, we need to handle both cases:
+      // 1. If it's the start of the overnight shift (not starting at 00:00)
+      // 2. If it's the continuation of an overnight shift (starting at 00:00)
+      if (selectedShift?.isOvernight) {
+        // Case 1: This is the start of the overnight shift
+        if (assignmentToRemove.startTime !== '00:00') {
+          const nextDayIdx = DAYS_OF_WEEK.indexOf(day) + 1;
+          const nextDay = nextDayIdx < DAYS_OF_WEEK.length 
+            ? DAYS_OF_WEEK[nextDayIdx] 
+            : DAYS_OF_WEEK[0]; // Wrap around to Monday if it's Sunday
 
-        // Remove both the continuation shift and its originating shift
-        const updatedCurrentDay = prev[day].filter((_, i) => i !== index);
-        const updatedPrevDay = prev[prevDay]?.filter(
-          assignment => !(assignment.shiftId === removedShift.shiftId && assignment.isOvernight)
-        ) || [];
+          // Remove the shift from the current day
+          const updatedCurrentDay = prev[day].filter((_, i) => i !== index);
+          
+          // Remove the corresponding overnight shift from the next day
+          const updatedNextDay = prev[nextDay].filter(assignment => 
+            assignment.shiftId !== assignmentToRemove.shiftId || 
+            assignment.startTime !== '00:00'
+          );
 
-        return {
-          ...prev,
-          [day]: updatedCurrentDay,
-          [prevDay]: updatedPrevDay
-        };
+          return {
+            ...prev,
+            [day]: updatedCurrentDay,
+            [nextDay]: updatedNextDay,
+          };
+        }
+        // Case 2: This is the continuation of an overnight shift
+        else {
+          const prevDayIdx = DAYS_OF_WEEK.indexOf(day) - 1;
+          const prevDay = prevDayIdx >= 0 
+            ? DAYS_OF_WEEK[prevDayIdx] 
+            : DAYS_OF_WEEK[DAYS_OF_WEEK.length - 1]; // Wrap around to Sunday if it's Monday
+
+          // Remove the shift from the current day
+          const updatedCurrentDay = prev[day].filter((_, i) => i !== index);
+          
+          // Remove the corresponding overnight shift from the previous day
+          const updatedPrevDay = prev[prevDay].filter(assignment => 
+            assignment.shiftId !== assignmentToRemove.shiftId || 
+            assignment.startTime === '00:00'
+          );
+
+          return {
+            ...prev,
+            [day]: updatedCurrentDay,
+            [prevDay]: updatedPrevDay,
+          };
+        }
       }
 
-      // If this is the originating shift of an overnight shift, remove both
-      if (removedShift?.isOvernight) {
-        const nextDayIndex = DAYS_OF_WEEK.indexOf(day) + 1;
-        const nextDay = nextDayIndex < DAYS_OF_WEEK.length 
-          ? DAYS_OF_WEEK[nextDayIndex] 
-          : DAYS_OF_WEEK[0];
-
-        // Remove both the originating shift and its continuation
-        const updatedCurrentDay = prev[day].filter((_, i) => i !== index);
-        const updatedNextDay = prev[nextDay]?.filter(
-          assignment => !(assignment.shiftId === removedShift.shiftId && assignment.startTime === '00:00')
-        ) || [];
-
-        return {
-          ...prev,
-          [day]: updatedCurrentDay,
-          [nextDay]: updatedNextDay
-        };
-      }
-
-      // For regular shifts, just remove the current shift
+      // For non-overnight shifts, just remove from the current day
       return {
         ...prev,
-        [day]: prev[day].filter((_, i) => i !== index)
+        [day]: prev[day].filter((_, i) => i !== index),
       };
     });
   };
 
   const handleShiftAssignmentChange = (day: string, index: number, field: keyof DayShiftAssignment, value: any) => {
     setWeeklyDesign(prev => {
-      const updatedAssignments = [...prev[day]];
-      
-      if (field === 'shiftId') {
-        const selectedShift = shifts.find(s => s.id === value);
-        if (selectedShift) {
-          const isOvernight = isOvernightShift(selectedShift.startTime, selectedShift.endTime);
-          
-          // Update the current shift
-          updatedAssignments[index] = {
-            ...updatedAssignments[index],
-            shiftId: value,
-            startTime: selectedShift.startTime,
-            endTime: isOvernight ? '23:59' : selectedShift.endTime,
-            isOvernight,
-            nextDayEndTime: isOvernight ? selectedShift.endTime : undefined
-          };
-
-          // Handle overnight shifts
-          if (isOvernight) {
-            const nextDayIndex = DAYS_OF_WEEK.indexOf(day) + 1;
-            const nextDay = nextDayIndex < DAYS_OF_WEEK.length 
-              ? DAYS_OF_WEEK[nextDayIndex] 
-              : DAYS_OF_WEEK[0];
-
-            // Check if this shift already has a continuation on the next day
-            const hasContinuation = prev[nextDay]?.some(
-              assignment => assignment.shiftId === value && assignment.startTime === '00:00'
-            );
-
-            if (!hasContinuation) {
-              // Add the continuation shift to the next day
-              const nextDayAssignment: DayShiftAssignment = {
-                shiftId: value,
-                startTime: '00:00',
-                endTime: selectedShift.endTime,
-                isOvernight: true
-              };
-              
+      const updatedAssignments = prev[day].map((assignment, i) => {
+        if (i === index) {
+          if (field === 'shiftId') {
+            // When a shift is selected, set its predefined times
+            const selectedShift = shifts.find(s => s.id === value);
+            if (selectedShift) {
+              const isOvernight = isOvernightShift(selectedShift.startTime, selectedShift.endTime);
               return {
-                ...prev,
-                [day]: updatedAssignments,
-                [nextDay]: [...(prev[nextDay] || []), nextDayAssignment]
+                ...assignment,
+                shiftId: value,
+                startTime: selectedShift.startTime,
+                endTime: isOvernight ? '23:59' : selectedShift.endTime,
+                isOvernight,
+                nextDayEndTime: isOvernight ? selectedShift.endTime : undefined,
               };
             }
           }
+          return { ...assignment, [field]: value };
         }
-      } else {
-        // For non-shiftId changes, just update the field
-        updatedAssignments[index] = {
-          ...updatedAssignments[index],
-          [field]: value
-        };
+        return assignment;
+      });
+
+      // If this is an overnight shift, also add it to the next day's schedule
+      if (field === 'shiftId') {
+        const selectedShift = shifts.find(s => s.id === value);
+        if (selectedShift && isOvernightShift(selectedShift.startTime, selectedShift.endTime)) {
+          const nextDayIndex = DAYS_OF_WEEK.indexOf(day) + 1;
+          const nextDay = nextDayIndex < DAYS_OF_WEEK.length 
+            ? DAYS_OF_WEEK[nextDayIndex] 
+            : DAYS_OF_WEEK[0]; // Wrap around to Monday if it's Sunday
+
+          const nextDayAssignment: DayShiftAssignment = {
+            shiftId: value,
+            startTime: '00:00',
+            endTime: selectedShift.endTime,
+            isOvernight: true,
+          };
+          
+          return {
+            ...prev,
+            [day]: updatedAssignments,
+            [nextDay]: [...(prev[nextDay] || []), nextDayAssignment],
+          };
+        }
       }
 
       return {
         ...prev,
-        [day]: updatedAssignments
+        [day]: updatedAssignments,
       };
     });
   };
@@ -438,6 +441,16 @@ export default function ShiftManagement() {
     );
   };
 
+  const sortShiftsByStartTime = (shifts: DayShiftAssignment[]) => {
+    return [...shifts].sort((a, b) => {
+      const [aHour, aMinute] = a.startTime.split(':').map(Number);
+      const [bHour, bMinute] = b.startTime.split(':').map(Number);
+      
+      if (aHour !== bHour) return aHour - bHour;
+      return aMinute - bMinute;
+    });
+  };
+
   const renderWeeklyDesign = () => (
     <Box sx={{ mt: 4 }}>
       <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -515,7 +528,7 @@ export default function ShiftManagement() {
                 </AccordionSummary>
                 <AccordionDetails sx={{ px: 0, pt: 2 }}>
                   <Stack spacing={1.5}>
-                    {weeklyDesign[day].map((assignment, index) => {
+                    {sortShiftsByStartTime(weeklyDesign[day]).map((assignment, index) => {
                       const selectedShift = shifts.find(s => s.id === assignment.shiftId);
                       const shiftColor = selectedShift?.color || '#1976d2';
                       const isOvernight = selectedShift?.isOvernight;
