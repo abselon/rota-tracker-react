@@ -10,6 +10,7 @@
 
 # production
 /build
+temp_auto_push.bat
 
 # misc
 .DS_Store
@@ -21,4 +22,6 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-rota-tracker-react\src\firebase\config.ts
+rota-tracker-react\src\firebase\config.ts.gitignore
+temp_interactive_push.bat
+branch_structure.json
