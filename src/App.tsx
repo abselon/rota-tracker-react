@@ -2,6 +2,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { AppProvider } from './context/AppContext';
 import theme from './theme';
 import Layout from './components/Layout';
@@ -13,27 +15,31 @@ import ShiftManagement from './pages/ShiftManagement';
 import WeeklyScheduleManagement from './pages/WeeklyScheduleManagement';
 import RoleManagement from './pages/RoleManagement';
 import MasterCalendar from './pages/MasterCalendar';
+import { AdBlockerAlert } from './components/AdBlockerAlert';
 
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AppProvider>
-        <Router>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/master-calendar" element={<MasterCalendar />} />
-              <Route path="/calendar" element={<RotaCalendar />} />
-              <Route path="/shift-calendar" element={<ShiftBasedCalendar />} />
-              <Route path="/employees" element={<EmployeeManagement />} />
-              <Route path="/shifts" element={<ShiftManagement />} />
-              <Route path="/schedules" element={<WeeklyScheduleManagement />} />
-              <Route path="/roles" element={<RoleManagement />} />
-            </Routes>
-          </Layout>
-        </Router>
-      </AppProvider>
+      <LocalizationProvider dateAdapter={AdapterDateFns}>
+        <AppProvider>
+          <Router>
+            <AdBlockerAlert />
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/master-calendar" element={<MasterCalendar />} />
+                <Route path="/calendar" element={<RotaCalendar />} />
+                <Route path="/shift-calendar" element={<ShiftBasedCalendar />} />
+                <Route path="/employees" element={<EmployeeManagement />} />
+                <Route path="/shifts" element={<ShiftManagement />} />
+                <Route path="/schedules" element={<WeeklyScheduleManagement />} />
+                <Route path="/roles" element={<RoleManagement />} />
+              </Routes>
+            </Layout>
+          </Router>
+        </AppProvider>
+      </LocalizationProvider>
     </ThemeProvider>
   );
 }
