@@ -441,7 +441,7 @@ export default function ShiftManagement() {
     );
   };
 
-  const sortShiftsByStartTime = (shifts: DayShiftAssignment[]) => {
+  const sortShiftsByStartTime = (shifts: DayShiftAssignment[]): DayShiftAssignment[] => {
     return [...shifts].sort((a, b) => {
       const [aHour, aMinute] = a.startTime.split(':').map(Number);
       const [bHour, bMinute] = b.startTime.split(':').map(Number);
@@ -761,7 +761,7 @@ export default function ShiftManagement() {
       setWarningMessage({
         open: true,
         title: 'Invalid Role Assignment',
-        message: `Cannot assign ${employee.name} to this shift. Required roles: ${shift.roles.map(r => {
+        message: `Cannot assign ${employee.name} to this shift. Required roles: ${shift.roles.map((r: ShiftRole) => {
           const role = roles.find(role => role.id === r.roleId);
           return role?.name || r.roleId;
         }).join(', ')}`,
@@ -951,7 +951,7 @@ export default function ShiftManagement() {
                             Required Roles:
                           </Typography>
                           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {shift.roles.map((role, index) => {
+                            {shift.roles.map((role: ShiftRole, index: number) => {
                               const roleData = roles.find(r => r.id === role.roleId);
                               if (!roleData) return null;
                               return (

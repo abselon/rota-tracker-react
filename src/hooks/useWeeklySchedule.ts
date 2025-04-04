@@ -80,7 +80,7 @@ export function useWeeklySchedule() {
         shifts: {
           ...schedule.shifts,
           [dateString]: schedule.shifts[dateString]?.filter(
-            (assignment) => assignment.id !== assignmentId
+            (assignment: ShiftAssignment) => assignment.id !== assignmentId
           ) || [],
         },
       };
@@ -124,7 +124,7 @@ export function useWeeklySchedule() {
         const newDate = new Date(oldDate);
         newDate.setDate(newDate.getDate() + 7);
 
-        newSchedule.shifts[formatDate(newDate)] = assignments.map((assignment) => ({
+        newSchedule.shifts[formatDate(newDate)] = (assignments as ShiftAssignment[]).map((assignment: ShiftAssignment) => ({
           ...assignment,
           id: `${assignment.id}-copy`,
           date: newDate.toISOString(),

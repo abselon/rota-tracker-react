@@ -1,4 +1,4 @@
-import { Shift, Employee, ShiftAssignment } from '../types';
+import { Shift, Employee, ShiftAssignment, ShiftRole } from '../types';
 import { isOverlapping, calculateShiftDuration } from './dateUtils';
 
 export const validateShiftTimes = (startTime: Date, endTime: Date): boolean => {
@@ -68,7 +68,7 @@ export const checkShiftConflicts = (
 
 export const generateShiftColor = (shift: Shift): string => {
   // Generate a consistent color based on shift name
-  const hash = shift.name.split('').reduce((acc, char) => {
+  const hash = shift.name.split('').reduce((acc: number, char: string) => {
     return char.charCodeAt(0) + ((acc << 5) - acc);
   }, 0);
 
@@ -103,7 +103,7 @@ export const hasRequiredRole = (employee: Employee, shift: Shift): boolean => {
   if (!shift.roles || shift.roles.length === 0) return true;
 
   // Check if employee has any of the required roles
-  return shift.roles.some(shiftRole => {
+  return shift.roles.some((shiftRole: ShiftRole) => {
     const employeeRoles = Array.isArray(employee.role) ? employee.role : [employee.role];
     return employeeRoles.includes(shiftRole.roleId);
   });

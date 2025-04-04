@@ -685,7 +685,7 @@ const RotaCalendar: React.FC = () => {
                 value={selectedEmployee?.color || ''}
                 onChange={(e) => {
                   const color = e.target.value;
-                  setSelectedEmployee((prev) => {
+                  setSelectedEmployee((prev: Employee | null) => {
                     if (prev) {
                       return { ...prev, color };
                     }

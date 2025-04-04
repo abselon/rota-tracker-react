@@ -77,7 +77,7 @@ export function useEmployees() {
           employee.name.toLowerCase().includes(lowercaseQuery) ||
           employee.email.toLowerCase().includes(lowercaseQuery) ||
           (Array.isArray(employee.role) 
-            ? employee.role.some(roleId => {
+            ? employee.role.some((roleId: string) => {
                 const role = roles.find(r => r.id === roleId);
                 return role?.name.toLowerCase().includes(lowercaseQuery);
               })
