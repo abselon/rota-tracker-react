@@ -81,7 +81,6 @@ interface DayShiftAssignment {
   endTime: string;
   isOvernight: boolean;
   nextDayEndTime?: string;
-  shifts?: string[];
 }
 
 interface WeeklyDesign {
@@ -135,55 +134,97 @@ export default function ShiftManagement() {
   });
   const [firebaseBlockedError, setFirebaseBlockedError] = useState(false);
 
-  // Initialize weekly design if empty
+  // Initialize weekly design with proper structure
   useEffect(() => {
-    if (Object.keys(weeklyDesign).length === 0) {
-      const initialDesign: WeeklyDesign = {};
+    const initializeWeeklyDesign = () => {
+      const design: WeeklyDesign = {};
       DAYS_OF_WEEK.forEach(day => {
-        initialDesign[day] = [];
+        design[day] = [];
       });
-      setWeeklyDesign(initialDesign);
-    }
-  }, [weeklyDesign]);
+      setWeeklyDesign(design);
+    };
 
-  // Add this useEffect after the existing useEffect
+    if (Object.keys(weeklyDesign).length === 0) {
+      initializeWeeklyDesign();
+    }
+  }, []);
+
+  // Load existing assignments into weekly design
   useEffect(() => {
     const loadWeeklyDesign = () => {
-      const today = new Date();
-      const weekStart = new Date(today.setDate(today.getDate() - today.getDay() + 1));
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
+      try {
+        const today = new Date();
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay() + 1); // Set to Monday
+        weekStart.setHours(0, 0, 0, 0);
 
-      const weeklyAssignments = state.assignments.filter(assignment => {
-        const assignmentDate = new Date(assignment.date);
-        return assignmentDate >= weekStart && assignmentDate <= weekEnd;
-      });
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
 
-      const newWeeklyDesign: WeeklyDesign = {};
-      DAYS_OF_WEEK.forEach(day => {
-        newWeeklyDesign[day] = [];
-      });
-
-      weeklyAssignments.forEach(assignment => {
-        const assignmentDate = new Date(assignment.date);
-        const dayIndex = (assignmentDate.getDay() + 6) % 7; // Convert to 0-6 where 0 is Monday
-        const day = DAYS_OF_WEEK[dayIndex];
-
-        newWeeklyDesign[day].push({
-          shiftId: assignment.shiftId,
-          startTime: assignment.startTime,
-          endTime: assignment.endTime,
-          isOvernight: assignment.isOvernight,
+        // Filter assignments for current week
+        const weeklyAssignments = state.assignments.filter(assignment => {
+          const assignmentDate = new Date(assignment.date);
+          return assignmentDate >= weekStart && assignmentDate <= weekEnd;
         });
-      });
 
-      setWeeklyDesign(newWeeklyDesign);
+        // Group assignments by day
+        const design: WeeklyDesign = {};
+        DAYS_OF_WEEK.forEach(day => {
+          design[day] = [];
+        });
+
+        weeklyAssignments.forEach(assignment => {
+          const assignmentDate = new Date(assignment.date);
+          const dayIndex = (assignmentDate.getDay() + 6) % 7; // Convert to 0-6 where 0 is Monday
+          const day = DAYS_OF_WEEK[dayIndex];
+
+          const shift = shifts.find(s => s.id === assignment.shiftId);
+          if (!shift) return;
+
+          // For overnight shifts, handle both parts
+          if (assignment.isOvernight) {
+            if (assignment.startTime !== '00:00') {
+              // This is the first part of an overnight shift
+              design[day].push({
+                shiftId: assignment.shiftId,
+                startTime: assignment.startTime,
+                endTime: '23:59',
+                isOvernight: true,
+                nextDayEndTime: shift.endTime
+              });
+
+              // Add the continuation to the next day
+              const nextDayIndex = (dayIndex + 1) % 7;
+              const nextDay = DAYS_OF_WEEK[nextDayIndex];
+              design[nextDay].push({
+                shiftId: assignment.shiftId,
+                startTime: '00:00',
+                endTime: shift.endTime,
+                isOvernight: true
+              });
+            }
+          } else {
+            // Regular shift
+            design[day].push({
+              shiftId: assignment.shiftId,
+              startTime: assignment.startTime,
+              endTime: assignment.endTime,
+              isOvernight: false
+            });
+          }
+        });
+
+        setWeeklyDesign(design);
+      } catch (error) {
+        console.error('Error loading weekly design:', error);
+      }
     };
 
     if (state.assignments.length > 0) {
       loadWeeklyDesign();
     }
-  }, [state.assignments]);
+  }, [state.assignments, shifts]);
 
   const parseTimeString = (timeStr: string): Date => {
     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -226,16 +267,52 @@ export default function ShiftManagement() {
   };
 
   const handleAddShiftToDay = (day: string) => {
-    const newAssignment: DayShiftAssignment = {
-      shiftId: '',
-      startTime: '09:00',
-      endTime: '17:00',
-      isOvernight: false,
-    };
-    setWeeklyDesign(prev => ({
-      ...prev,
-      [day]: [...prev[day], newAssignment],
-    }));
+    if (shifts.length === 0) {
+      setWarningMessage({
+        open: true,
+        title: 'No Shifts Available',
+        message: 'Please create at least one shift type before adding shifts to the schedule.',
+      });
+      return;
+    }
+
+    const defaultShift = shifts[0];
+    const isOvernight = isOvernightShift(defaultShift.startTime, defaultShift.endTime);
+
+    setWeeklyDesign(prev => {
+      const updatedDesign = { ...prev };
+      
+      // Add the main shift
+      updatedDesign[day] = [
+        ...updatedDesign[day],
+        {
+          shiftId: defaultShift.id,
+          startTime: defaultShift.startTime,
+          endTime: isOvernight ? '23:59' : defaultShift.endTime,
+          isOvernight,
+          nextDayEndTime: isOvernight ? defaultShift.endTime : undefined
+        }
+      ];
+
+      // If overnight, add the continuation to the next day
+      if (isOvernight) {
+        const nextDayIndex = (DAYS_OF_WEEK.indexOf(day) + 1) % 7;
+        const nextDay = DAYS_OF_WEEK[nextDayIndex];
+        
+        updatedDesign[nextDay] = [
+          ...updatedDesign[nextDay],
+          {
+            shiftId: defaultShift.id,
+            startTime: '00:00',
+            endTime: defaultShift.endTime,
+            isOvernight: true
+          }
+        ];
+      }
+
+      return updatedDesign;
+    });
+
     setExpandedDays(prev => [...prev, day]);
   };
 
@@ -304,55 +381,64 @@ export default function ShiftManagement() {
 
   const handleShiftAssignmentChange = (day: string, index: number, field: keyof DayShiftAssignment, value: any) => {
     setWeeklyDesign(prev => {
-      const updatedAssignments = prev[day].map((assignment, i) => {
-        if (i === index) {
-          if (field === 'shiftId') {
-            // When a shift is selected, set its predefined times
-            const selectedShift = shifts.find(s => s.id === value);
-            if (selectedShift) {
-              const isOvernight = isOvernightShift(selectedShift.startTime, selectedShift.endTime);
-              return {
-                ...assignment,
-                shiftId: value,
-                startTime: selectedShift.startTime,
-                endTime: isOvernight ? '23:59' : selectedShift.endTime,
-                isOvernight,
-                nextDayEndTime: isOvernight ? selectedShift.endTime : undefined,
-              };
-            }
-          }
-          return { ...assignment, [field]: value };
-        }
-        return assignment;
-      });
-
-      // If this is an overnight shift, also add it to the next day's schedule
       if (field === 'shiftId') {
         const selectedShift = shifts.find(s => s.id === value);
-        if (selectedShift && isOvernightShift(selectedShift.startTime, selectedShift.endTime)) {
+        if (!selectedShift) return prev;
+
+        const isOvernight = isOvernightShift(selectedShift.startTime, selectedShift.endTime);
+        const updatedAssignments = prev[day].map((assignment, i) => {
+          if (i === index) {
+            return {
+              ...assignment,
+              shiftId: value,
+              startTime: selectedShift.startTime,
+              endTime: isOvernight ? '23:59' : selectedShift.endTime,
+              isOvernight,
+              nextDayEndTime: isOvernight ? selectedShift.endTime : undefined,
+            };
+          }
+          return assignment;
+        });
+
+        // If this is an overnight shift, handle the next day part
+        if (isOvernight) {
           const nextDayIndex = DAYS_OF_WEEK.indexOf(day) + 1;
           const nextDay = nextDayIndex < DAYS_OF_WEEK.length 
             ? DAYS_OF_WEEK[nextDayIndex] 
-            : DAYS_OF_WEEK[0]; // Wrap around to Monday if it's Sunday
+            : DAYS_OF_WEEK[0];
 
-          const nextDayAssignment: DayShiftAssignment = {
+          // Remove any existing overnight continuation for this shift
+          const nextDayAssignments = prev[nextDay]?.filter(a => 
+            !(a.shiftId === value && a.startTime === '00:00')
+          ) || [];
+
+          // Add the new overnight continuation
+          nextDayAssignments.push({
             shiftId: value,
             startTime: '00:00',
             endTime: selectedShift.endTime,
             isOvernight: true,
-          };
-          
+          });
+
           return {
             ...prev,
             [day]: updatedAssignments,
-            [nextDay]: [...(prev[nextDay] || []), nextDayAssignment],
+            [nextDay]: nextDayAssignments,
           };
         }
+
+        return {
+          ...prev,
+          [day]: updatedAssignments,
+        };
       }
 
+      // Handle other field changes
       return {
         ...prev,
-        [day]: updatedAssignments,
+        [day]: prev[day].map((assignment, i) => 
+          i === index ? { ...assignment, [field]: value } : assignment
+        ),
       };
     });
   };
@@ -828,14 +914,13 @@ export default function ShiftManagement() {
 
   const saveWeeklyDesign = async () => {
     try {
-      // Calculate the current week's start and end dates
       const today = new Date();
       const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() - today.getDay() + 1); // Set to Monday
+      weekStart.setDate(today.getDate() - today.getDay() + 1);
       weekStart.setHours(0, 0, 0, 0);
-      
+
       const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6); // Set to Sunday
+      weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
 
       console.log('Saving weekly design for week:', {
@@ -843,61 +928,92 @@ export default function ShiftManagement() {
         end: weekEnd.toISOString()
       });
 
-      // First, delete all existing assignments for the current week
+      // Validate assignments
+      const invalidAssignments = [];
+      Object.entries(weeklyDesign).forEach(([day, assignments]) => {
+        assignments.forEach((assignment, index) => {
+          if (!assignment.shiftId) {
+            invalidAssignments.push({ day, index });
+          }
+        });
+      });
+
+      if (invalidAssignments.length > 0) {
+        setWarningMessage({
+          open: true,
+          title: 'Invalid Assignments',
+          message: `Found ${invalidAssignments.length} invalid assignments. Please ensure all shifts have been properly configured.`,
+          details: 'Each shift must have a selected shift type.'
+        });
+        return;
+      }
+
+      // Delete existing assignments
       const existingAssignments = state.assignments.filter(assignment => {
         const assignmentDate = new Date(assignment.date);
         return assignmentDate >= weekStart && assignmentDate <= weekEnd;
       });
 
-      console.log('Found existing assignments to delete:', existingAssignments.length);
-
-      // Delete existing assignments
       await Promise.all(existingAssignments.map(assignment => 
         deleteAssignment(assignment.id)
       ));
 
-      // Create new assignments for each day
+      // Create new assignments
       const assignmentsToCreate: Omit<ShiftAssignment, 'id'>[] = [];
-      
-      Object.entries(weeklyDesign).forEach(([day, dayAssignments]) => {
+      const processedOvernightShifts = new Set<string>();
+
+      Object.entries(weeklyDesign).forEach(([day, assignments]) => {
         const dayIndex = DAYS_OF_WEEK.indexOf(day);
-        if (dayIndex === -1) return;
+        const currentDate = new Date(weekStart);
+        currentDate.setDate(weekStart.getDate() + dayIndex);
 
-        const date = new Date(weekStart);
-        date.setDate(weekStart.getDate() + dayIndex);
-
-        dayAssignments.forEach(assignment => {
-          if (!assignment.shiftId) return;
-
+        assignments.forEach(assignment => {
           const shift = shifts.find(s => s.id === assignment.shiftId);
           if (!shift) return;
 
-          console.log('Creating assignment for:', {
-            day,
-            date: date.toISOString(),
-            shiftId: assignment.shiftId
-          });
+          // Skip processed overnight continuations
+          const overnightKey = `${assignment.shiftId}-${currentDate.toISOString()}`;
+          if (assignment.isOvernight && assignment.startTime === '00:00' &&
+              processedOvernightShifts.has(overnightKey)) {
+            return;
+          }
 
+          // Create the main assignment
           assignmentsToCreate.push({
             shiftId: assignment.shiftId,
-            employeeId: '', // Empty string for unassigned shifts
-            date: date.toISOString(),
+            employeeId: '',
+            date: currentDate.toISOString(),
             startTime: assignment.startTime,
-            endTime: assignment.endTime,
+            endTime: assignment.isOvernight ? '23:59' : assignment.endTime,
             isOvernight: assignment.isOvernight,
             status: 'pending'
           });
+
+          // Handle overnight shifts
+          if (assignment.isOvernight && assignment.startTime !== '00:00') {
+            const nextDate = new Date(currentDate);
+            nextDate.setDate(currentDate.getDate() + 1);
+            
+            assignmentsToCreate.push({
+              shiftId: assignment.shiftId,
+              employeeId: '',
+              date: nextDate.toISOString(),
+              startTime: '00:00',
+              endTime: assignment.nextDayEndTime || shift.endTime,
+              isOvernight: true,
+              status: 'pending'
+            });
+
+            processedOvernightShifts.add(`${assignment.shiftId}-${nextDate.toISOString()}`);
+          }
         });
       });
 
-      console.log('Creating new assignments:', assignmentsToCreate.length);
-
-      // Save all new assignments
+      // Save all assignments
       await Promise.all(assignmentsToCreate.map(assignment => 
         addAssignment(assignment)
       ));
 
-      // Show success message
       setWarningMessage({
         open: true,
         title: 'Success',
@@ -910,7 +1026,7 @@ export default function ShiftManagement() {
         open: true,
         title: 'Error',
         message: 'Failed to save weekly design',
-        details: error instanceof Error ? error.message : String(error),
+        details: error instanceof Error ? error.message : String(error)
       });
     }
   };
