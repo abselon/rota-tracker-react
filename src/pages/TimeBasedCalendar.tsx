@@ -170,13 +170,8 @@ const ShiftBasedCalendar: React.FC = () => {
     // Count how many times each role is assigned
     const roleCounts: Record<string, number> = {};
     shiftAssignments.forEach(assignment => {
-      const employee = employees.find(e => e.id === assignment.employeeId);
-      if (!employee) return;
-      
-      const employeeRoles = Array.isArray(employee.role) ? employee.role : [employee.role];
-      employeeRoles.forEach(roleId => {
-        roleCounts[roleId] = (roleCounts[roleId] || 0) + 1;
-      });
+      // Use the roleId from the assignment, not the employee's roles
+      roleCounts[assignment.roleId] = (roleCounts[assignment.roleId] || 0) + 1;
     });
 
     return roleCounts;
@@ -212,6 +207,13 @@ const ShiftBasedCalendar: React.FC = () => {
           return;
         }
 
+        // Verify that the selected role exists in the shift's roles
+        const shiftRole = selectedShift.roles.find(r => r.roleId === selectedRole);
+        if (!shiftRole) {
+          alert('Invalid role selected for this shift.');
+          return;
+        }
+
         const newAssignment: Omit<ShiftAssignment, 'id'> = {
           date: selectedDate.toISOString(),
           employeeId: selectedEmployee,
@@ -220,7 +222,7 @@ const ShiftBasedCalendar: React.FC = () => {
           endTime: selectedShift.endTime,
           isOvernight: selectedShift.isOvernight,
           status: 'pending',
-          roleId: selectedRole
+          roleId: shiftRole.roleId
         };
 
         await addAssignment(newAssignment);
@@ -877,17 +879,38 @@ const ShiftBasedCalendar: React.FC = () => {
             </Typography>
             <Divider sx={{ my: 1 }} />
             <List dense>
-              {getAssignmentsForShiftAndDate(selectedCell.shift.id, selectedCell.date).map((assignment) => (
-                <ListItem key={assignment.id}>
-                  <ListItemIcon>
-                    <PersonIcon color="primary" fontSize="small" />
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={getEmployeeName(assignment.employeeId)}
-                    secondary={assignment.status}
-                  />
-                </ListItem>
-              ))}
+              {getAssignmentsForShiftAndDate(selectedCell.shift.id, selectedCell.date).map((assignment) => {
+                const employee = employees.find(e => e.id === assignment.employeeId);
+                const role = roles.find(r => r.id === assignment.roleId);
+                console.log('Assignment:', assignment);
+                console.log('Found role:', role);
+                console.log('All roles:', roles);
+                return (
+                  <ListItem key={assignment.id}>
+                    <ListItemIcon>
+                      <PersonIcon color="primary" fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={getEmployeeName(assignment.employeeId)}
+                      secondary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              backgroundColor: role?.color || 'primary.main',
+                            }}
+                          />
+                          <Typography variant="caption" color="text.secondary">
+                            {role?.name || 'Unknown Role'} • {assignment.status}
+                          </Typography>
+                        </Box>
+                      }
+                    />
+                  </ListItem>
+                );
+              })}
             </List>
             <Button
               variant="outlined"
