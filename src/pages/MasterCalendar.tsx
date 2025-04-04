@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -16,18 +16,56 @@ import {
 import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  NightsStay as NightsStayIcon,
 } from '@mui/icons-material';
-import { format, addWeeks, subWeeks, startOfWeek, addDays } from 'date-fns';
+import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
+import { Shift, ShiftAssignment } from '../types';
+
+// Constants from ShiftManagement
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+interface DayShiftAssignment {
+  shiftId: string;
+  startTime: string;
+  endTime: string;
+  isOvernight: boolean;
+  nextDayEndTime?: string;
+}
+
+interface WeeklyDesign {
+  [day: string]: DayShiftAssignment[];
+}
 
 const MasterCalendar: React.FC = () => {
   const theme = useTheme();
   const { state } = useAppContext();
-  const { roles } = state;
+  const { roles, shifts, assignments } = state;
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date()));
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const shifts = ['Shift 1', 'Shift 2', 'Shift 3'];
+
+  // This would normally come from ShiftManagement's state
+  // For now, we'll use a default empty design
+  const weeklyDesign: WeeklyDesign = DAYS_OF_WEEK.reduce((acc, day) => {
+    acc[day] = [];
+    return acc;
+  }, {} as WeeklyDesign);
+
+  const getShiftsForDay = (date: Date): (Shift & { assignment: ShiftAssignment })[] => {
+    // Get assignments for this day
+    const dayAssignments = assignments.filter(assignment => {
+      const assignmentDate = new Date(assignment.date);
+      return isSameDay(assignmentDate, date);
+    });
+
+    // Map assignments to shifts
+    return dayAssignments.map(assignment => {
+      const shift = shifts.find(s => s.id === assignment.shiftId);
+      if (!shift) return null;
+      return { ...shift, assignment };
+    }).filter(Boolean) as (Shift & { assignment: ShiftAssignment })[];
+  };
 
   const handlePreviousWeek = () => {
     setWeekStart(subWeeks(weekStart, 1));
@@ -89,48 +127,72 @@ const MasterCalendar: React.FC = () => {
                     Role
                   </Box>
                 </TableCell>
-                {weekDays.map((day) => (
-                  <TableCell
-                    key={day.toISOString()}
-                    colSpan={3}
-                    align="center"
-                    sx={{
-                      borderBottom: `1px solid ${theme.palette.divider}`,
-                      borderLeft: `1px solid ${theme.palette.divider}`,
-                      fontWeight: 600,
-                      color: theme.palette.text.primary,
-                      pb: 1.5,
-                      pt: 2,
-                      backgroundColor: theme.palette.background.paper
-                    }}
-                  >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, color: theme.palette.primary.main }}>
-                      {format(day, 'EEEE')}
-                    </Typography>
-                    <Typography 
-                      variant="caption" 
-                      display="block" 
-                      sx={{ 
-                        color: theme.palette.text.secondary,
-                        mt: 0.5,
-                        fontSize: '0.75rem'
+                {weekDays.map((day) => {
+                  const dayShifts = getShiftsForDay(day);
+                  return (
+                    <TableCell
+                      key={day.toISOString()}
+                      colSpan={dayShifts.length || 1}
+                      align="center"
+                      sx={{
+                        borderBottom: `1px solid ${theme.palette.divider}`,
+                        borderLeft: `1px solid ${theme.palette.divider}`,
+                        fontWeight: 600,
+                        color: theme.palette.text.primary,
+                        pb: 1.5,
+                        pt: 2,
+                        backgroundColor: theme.palette.background.paper
                       }}
                     >
-                      {format(day, 'MMM d')}
-                    </Typography>
-                  </TableCell>
-                ))}
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: theme.palette.primary.main }}>
+                        {format(day, 'EEEE')}
+                      </Typography>
+                      <Typography 
+                        variant="caption" 
+                        display="block" 
+                        sx={{ 
+                          color: theme.palette.text.secondary,
+                          mt: 0.5,
+                          fontSize: '0.75rem'
+                        }}
+                      >
+                        {format(day, 'MMM d')}
+                      </Typography>
+                    </TableCell>
+                  );
+                })}
               </TableRow>
               <TableRow>
-                {weekDays.map((day) => (
-                  shifts.map((shift, index) => (
+                {weekDays.map((day) => {
+                  const dayShifts = getShiftsForDay(day);
+                  if (dayShifts.length === 0) {
+                    return (
+                      <TableCell
+                        key={`${day.toISOString()}-empty`}
+                        align="center"
+                        sx={{
+                          borderBottom: `1px solid ${theme.palette.divider}`,
+                          borderLeft: `1px solid ${theme.palette.divider}`,
+                          borderRight: `1px solid ${theme.palette.divider}`,
+                          fontWeight: 500,
+                          color: theme.palette.text.secondary,
+                          py: 1.5,
+                          backgroundColor: theme.palette.background.paper,
+                          fontSize: '0.75rem'
+                        }}
+                      >
+                        No shifts
+                      </TableCell>
+                    );
+                  }
+                  return dayShifts.map((shift, index) => (
                     <TableCell
-                      key={`${day.toISOString()}-${shift}`}
+                      key={`${day.toISOString()}-${shift.id}`}
                       align="center"
                       sx={{
                         borderBottom: `1px solid ${theme.palette.divider}`,
                         borderLeft: index === 0 ? `1px solid ${theme.palette.divider}` : 'none',
-                        borderRight: index === 2 ? `1px solid ${theme.palette.divider}` : 'none',
+                        borderRight: index === dayShifts.length - 1 ? `1px solid ${theme.palette.divider}` : 'none',
                         fontWeight: 500,
                         color: theme.palette.text.secondary,
                         py: 1.5,
@@ -138,12 +200,22 @@ const MasterCalendar: React.FC = () => {
                         fontSize: '0.75rem'
                       }}
                     >
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {shift}
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {shift.name}
+                        </Typography>
+                        {shift.isOvernight && (
+                          <Tooltip title="Overnight Shift">
+                            <NightsStayIcon fontSize="small" color="primary" />
+                          </Tooltip>
+                        )}
+                      </Box>
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
+                        {shift.assignment.startTime} - {shift.assignment.endTime}
                       </Typography>
                     </TableCell>
-                  ))
-                ))}
+                  ));
+                })}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -171,22 +243,48 @@ const MasterCalendar: React.FC = () => {
                     </Box>
                   ))}
                 </TableCell>
-                {weekDays.map((day) => (
-                  shifts.map((shift, shiftIndex) => (
+                {weekDays.map((day) => {
+                  const dayShifts = getShiftsForDay(day);
+                  if (dayShifts.length === 0) {
+                    return (
+                      <TableCell
+                        key={`${day.toISOString()}-empty`}
+                        sx={{
+                          borderBottom: 'none',
+                          backgroundColor: theme.palette.background.paper,
+                          p: 0,
+                          minWidth: '100px',
+                          borderLeft: `1px solid ${theme.palette.divider}`,
+                          borderRight: `1px solid ${theme.palette.divider}`,
+                        }}
+                      >
+                        {roles.map((role, roleIndex) => (
+                          <Box
+                            key={`${day.toISOString()}-empty-${role.id}`}
+                            sx={{
+                              p: 1,
+                              borderBottom: roleIndex < roles.length - 1 ? `1px solid ${theme.palette.divider}` : 'none',
+                            }}
+                          />
+                        ))}
+                      </TableCell>
+                    );
+                  }
+                  return dayShifts.map((shift, shiftIndex) => (
                     <TableCell
-                      key={`${day.toISOString()}-${shift}`}
+                      key={`${day.toISOString()}-${shift.id}`}
                       sx={{
                         borderBottom: 'none',
                         backgroundColor: theme.palette.background.paper,
                         p: 0,
                         minWidth: '100px',
                         borderLeft: shiftIndex === 0 ? `1px solid ${theme.palette.divider}` : 'none',
-                        borderRight: shiftIndex === 2 ? `1px solid ${theme.palette.divider}` : 'none',
+                        borderRight: shiftIndex === dayShifts.length - 1 ? `1px solid ${theme.palette.divider}` : 'none',
                       }}
                     >
                       {roles.map((role, roleIndex) => (
                         <Box
-                          key={`${day.toISOString()}-${shift}-${role.id}`}
+                          key={`${day.toISOString()}-${shift.id}-${role.id}`}
                           sx={{
                             p: 1,
                             borderBottom: roleIndex < roles.length - 1 ? `1px solid ${theme.palette.divider}` : 'none',
@@ -214,14 +312,14 @@ const MasterCalendar: React.FC = () => {
                                 fontWeight: 500
                               }}
                             >
-                              Rc Role1
+                              {role.name}
                             </Typography>
                           </Paper>
                         </Box>
                       ))}
                     </TableCell>
-                  ))
-                ))}
+                  ));
+                })}
               </TableRow>
             </TableBody>
           </Table>
