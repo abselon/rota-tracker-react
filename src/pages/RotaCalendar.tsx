@@ -50,6 +50,8 @@ import {
   Email as EmailIcon,
   Phone as PhoneIcon,
   Work as WorkIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday } from 'date-fns';
 import { useAppContext } from '../context/AppContext';
@@ -76,6 +78,7 @@ const RotaCalendar: React.FC = () => {
   const [selectedAssignment, setSelectedAssignment] = useState<ShiftAssignment | null>(null);
   const [dayAnchorEl, setDayAnchorEl] = useState<HTMLElement | null>(null);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [firebaseBlockedError, setFirebaseBlockedError] = useState(false);
 
   const getWeekDays = (startDate: Date) => {
     return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
@@ -107,36 +110,59 @@ const RotaCalendar: React.FC = () => {
     setDeleteDialogOpen(true);
   };
 
+  const handleFirebaseError = (error: any) => {
+    if (error?.message?.includes('ERR_BLOCKED_BY_CLIENT') || 
+        error?.code === 'permission-denied' ||
+        error?.name === 'FirebaseError') {
+      setFirebaseBlockedError(true);
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (assignmentToDelete) {
-      await deleteAssignment(assignmentToDelete.id);
-      setDeleteDialogOpen(false);
-      setAssignmentToDelete(null);
+      try {
+        await deleteAssignment(assignmentToDelete.id);
+        setDeleteDialogOpen(false);
+        setAssignmentToDelete(null);
+      } catch (error) {
+        console.error('Error deleting assignment:', error);
+        handleFirebaseError(error);
+      }
     }
   };
 
   const handleSubmit = async () => {
     if (selectedDate && selectedEmployee && selectedShift) {
-      // Check if employee already has this shift on this day
-      const existingAssignment = assignments.find(
-        (assignment) =>
-          assignment.employeeId === selectedEmployee.id &&
-          assignment.shiftId === selectedShift.id &&
-          isSameDay(new Date(assignment.date), selectedDate)
-      );
+      try {
+        // Check if employee already has this shift on this day
+        const existingAssignment = assignments.find(
+          (assignment) =>
+            assignment.employeeId === selectedEmployee.id &&
+            assignment.shiftId === selectedShift.id &&
+            isSameDay(new Date(assignment.date), selectedDate)
+        );
 
-      if (existingAssignment) {
-        alert('This employee is already assigned to this shift on this day.');
-        return;
+        if (existingAssignment) {
+          alert('This employee is already assigned to this shift on this day.');
+          return;
+        }
+
+        const newAssignment: Omit<ShiftAssignment, 'id'> = {
+          date: selectedDate.toISOString(),
+          employeeId: selectedEmployee.id,
+          shiftId: selectedShift.id,
+          startTime: selectedShift.startTime,
+          endTime: selectedShift.endTime,
+          isOvernight: selectedShift.isOvernight,
+          status: 'pending'
+        };
+
+        await addAssignment(newAssignment);
+        handleCloseDialog();
+      } catch (error) {
+        console.error('Error adding assignment:', error);
+        handleFirebaseError(error);
       }
-
-      await addAssignment({
-        date: selectedDate.toISOString(),
-        employeeId: selectedEmployee.id,
-        shiftId: selectedShift.id,
-        status: 'pending',
-      });
-      handleCloseDialog();
     }
   };
 
@@ -735,6 +761,75 @@ const RotaCalendar: React.FC = () => {
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
           <Button onClick={handleDeleteConfirm} color="error" variant="contained">
             Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={firebaseBlockedError}
+        onClose={() => setFirebaseBlockedError(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WarningIcon color="warning" />
+            <Typography>Firebase Connection Blocked</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography>
+              It looks like your browser is blocking connections to Firebase. This is usually caused by ad blockers or privacy extensions.
+            </Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              To fix this, you can:
+            </Typography>
+            <List>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Temporarily disable your ad blocker for this site"
+                  secondary="This is the quickest solution"
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Add these domains to your ad blocker's whitelist:"
+                  secondary="firestore.googleapis.com, *.firebaseio.com, *.firebase.google.com"
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Try using the app in an Incognito/Private window"
+                  secondary="Extensions are usually disabled in private browsing"
+                />
+              </ListItem>
+            </List>
+            <Alert severity="info" sx={{ mt: 2 }}>
+              After making these changes, you may need to refresh the page.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFirebaseBlockedError(false)}>
+            Close
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={() => {
+              window.location.reload();
+            }}
+          >
+            Refresh Page
           </Button>
         </DialogActions>
       </Dialog>

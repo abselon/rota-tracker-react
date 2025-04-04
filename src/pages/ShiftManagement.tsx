@@ -37,6 +37,10 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -55,7 +59,7 @@ import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useAppContext } from '../context/AppContext';
-import { Shift, ShiftRole, Employee } from '../types';
+import { Shift, ShiftRole, Employee, ShiftAssignment } from '../types';
 import { SketchPicker } from 'react-color';
 import { format } from 'date-fns';
 import { hasRequiredRole } from '../utils/shiftUtils';
@@ -100,7 +104,7 @@ const isOvernightShift = (startTime: string, endTime: string): boolean => {
 
 export default function ShiftManagement() {
   const theme = useTheme();
-  const { state, addShift, updateShift, deleteShift, roles } = useAppContext();
+  const { state, addShift, updateShift, deleteShift, addAssignment, deleteAssignment, roles } = useAppContext();
   const { shifts, isLoading, error } = state;
   const employees = state.employees;
   const [open, setOpen] = useState(false);
@@ -129,6 +133,7 @@ export default function ShiftManagement() {
     title: '',
     message: '',
   });
+  const [firebaseBlockedError, setFirebaseBlockedError] = useState(false);
 
   // Initialize weekly design if empty
   useEffect(() => {
@@ -140,6 +145,45 @@ export default function ShiftManagement() {
       setWeeklyDesign(initialDesign);
     }
   }, [weeklyDesign]);
+
+  // Add this useEffect after the existing useEffect
+  useEffect(() => {
+    const loadWeeklyDesign = () => {
+      const today = new Date();
+      const weekStart = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+
+      const weeklyAssignments = state.assignments.filter(assignment => {
+        const assignmentDate = new Date(assignment.date);
+        return assignmentDate >= weekStart && assignmentDate <= weekEnd;
+      });
+
+      const newWeeklyDesign: WeeklyDesign = {};
+      DAYS_OF_WEEK.forEach(day => {
+        newWeeklyDesign[day] = [];
+      });
+
+      weeklyAssignments.forEach(assignment => {
+        const assignmentDate = new Date(assignment.date);
+        const dayIndex = (assignmentDate.getDay() + 6) % 7; // Convert to 0-6 where 0 is Monday
+        const day = DAYS_OF_WEEK[dayIndex];
+
+        newWeeklyDesign[day].push({
+          shiftId: assignment.shiftId,
+          startTime: assignment.startTime,
+          endTime: assignment.endTime,
+          isOvernight: assignment.isOvernight,
+        });
+      });
+
+      setWeeklyDesign(newWeeklyDesign);
+    };
+
+    if (state.assignments.length > 0) {
+      loadWeeklyDesign();
+    }
+  }, [state.assignments]);
 
   const parseTimeString = (timeStr: string): Date => {
     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -774,6 +818,103 @@ export default function ShiftManagement() {
     // ... rest of your assignment logic ...
   };
 
+  const handleFirebaseError = (error: any) => {
+    if (error?.message?.includes('ERR_BLOCKED_BY_CLIENT') || 
+        error?.code === 'permission-denied' ||
+        error?.name === 'FirebaseError') {
+      setFirebaseBlockedError(true);
+    }
+  };
+
+  const saveWeeklyDesign = async () => {
+    try {
+      // Calculate the current week's start and end dates
+      const today = new Date();
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay() + 1); // Set to Monday
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6); // Set to Sunday
+      weekEnd.setHours(23, 59, 59, 999);
+
+      console.log('Saving weekly design for week:', {
+        start: weekStart.toISOString(),
+        end: weekEnd.toISOString()
+      });
+
+      // First, delete all existing assignments for the current week
+      const existingAssignments = state.assignments.filter(assignment => {
+        const assignmentDate = new Date(assignment.date);
+        return assignmentDate >= weekStart && assignmentDate <= weekEnd;
+      });
+
+      console.log('Found existing assignments to delete:', existingAssignments.length);
+
+      // Delete existing assignments
+      await Promise.all(existingAssignments.map(assignment => 
+        deleteAssignment(assignment.id)
+      ));
+
+      // Create new assignments for each day
+      const assignmentsToCreate: Omit<ShiftAssignment, 'id'>[] = [];
+      
+      Object.entries(weeklyDesign).forEach(([day, dayAssignments]) => {
+        const dayIndex = DAYS_OF_WEEK.indexOf(day);
+        if (dayIndex === -1) return;
+
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + dayIndex);
+
+        dayAssignments.forEach(assignment => {
+          if (!assignment.shiftId) return;
+
+          const shift = shifts.find(s => s.id === assignment.shiftId);
+          if (!shift) return;
+
+          console.log('Creating assignment for:', {
+            day,
+            date: date.toISOString(),
+            shiftId: assignment.shiftId
+          });
+
+          assignmentsToCreate.push({
+            shiftId: assignment.shiftId,
+            employeeId: '', // Empty string for unassigned shifts
+            date: date.toISOString(),
+            startTime: assignment.startTime,
+            endTime: assignment.endTime,
+            isOvernight: assignment.isOvernight,
+            status: 'pending'
+          });
+        });
+      });
+
+      console.log('Creating new assignments:', assignmentsToCreate.length);
+
+      // Save all new assignments
+      await Promise.all(assignmentsToCreate.map(assignment => 
+        addAssignment(assignment)
+      ));
+
+      // Show success message
+      setWarningMessage({
+        open: true,
+        title: 'Success',
+        message: 'Weekly design saved successfully',
+      });
+    } catch (error) {
+      console.error('Error saving weekly design:', error);
+      handleFirebaseError(error);
+      setWarningMessage({
+        open: true,
+        title: 'Error',
+        message: 'Failed to save weekly design',
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   return (
     <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {error && (
@@ -981,7 +1122,19 @@ export default function ShiftManagement() {
           )}
         </Grid>
       ) : (
-        renderWeeklyDesign()
+        <>
+          {renderWeeklyDesign()}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={saveWeeklyDesign}
+              startIcon={<CheckCircleIcon />}
+            >
+              Save Weekly Design
+            </Button>
+          </Box>
+        </>
       )}
 
       <Dialog 
@@ -1225,6 +1378,75 @@ export default function ShiftManagement() {
         <DialogActions>
           <Button onClick={() => setWarningMessage(prev => ({ ...prev, open: false }))}>
             OK
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={firebaseBlockedError}
+        onClose={() => setFirebaseBlockedError(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WarningIcon color="warning" />
+            <Typography>Firebase Connection Blocked</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography>
+              It looks like your browser is blocking connections to Firebase. This is usually caused by ad blockers or privacy extensions.
+            </Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              To fix this, you can:
+            </Typography>
+            <List>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Temporarily disable your ad blocker for this site"
+                  secondary="This is the quickest solution"
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Add these domains to your ad blocker's whitelist:"
+                  secondary="firestore.googleapis.com, *.firebaseio.com, *.firebase.google.com"
+                />
+              </ListItem>
+              <ListItem>
+                <ListItemIcon>
+                  <CheckCircleIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText 
+                  primary="Try using the app in an Incognito/Private window"
+                  secondary="Extensions are usually disabled in private browsing"
+                />
+              </ListItem>
+            </List>
+            <Alert severity="info" sx={{ mt: 2 }}>
+              After making these changes, you may need to refresh the page.
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setFirebaseBlockedError(false)}>
+            Close
+          </Button>
+          <Button 
+            variant="contained"
+            onClick={() => {
+              window.location.reload();
+            }}
+          >
+            Refresh Page
           </Button>
         </DialogActions>
       </Dialog>

@@ -101,6 +101,9 @@ export interface ShiftAssignment {
   shiftId: string;
   employeeId: string;
   date: string;  // ISO date string
+  startTime: string;  // HH:mm format
+  endTime: string;    // HH:mm format
+  isOvernight: boolean;
   status: 'pending' | 'confirmed' | 'declined' | 'cancelled' | 'completed';
   notes?: string;
 }

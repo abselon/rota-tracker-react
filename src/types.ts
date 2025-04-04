@@ -45,11 +45,14 @@ export interface DayAvailability {
 
 export interface ShiftAssignment {
   id: string;
-  date: string; // Assuming date is stored as a string
+  date: string; // ISO date string
   employeeId: string;
   shiftId: string;
-  status: string;
-  color?: string; // Add this line to include color
+  startTime: string;  // HH:mm format
+  endTime: string;    // HH:mm format
+  isOvernight: boolean;
+  status: 'pending' | 'confirmed' | 'declined' | 'cancelled' | 'completed';
+  notes?: string;
 }
 
 export interface WeeklySchedule {
