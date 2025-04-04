@@ -749,7 +749,7 @@ export default function ShiftManagement() {
     </Box>
   );
 
-  const handleEmployeeAssignment = (e: React.ChangeEvent<HTMLInputElement>, shiftId: string) => {
+  const handleEmployeeAssignment = (e: React.ChangeEvent<HTMLSelectElement>, shiftId: string) => {
     const employeeId = e.target.value;
     const shift = shifts.find(s => s.id === shiftId);
     if (!shift) return;

@@ -1,36 +1,55 @@
 export interface DayAvailability {
   isClosed: boolean;
-  startTime: string;
-  endTime: string;
+  start: string;
+  end: string;
 }
 
 export interface Employee {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: string | string[];
+  phone: string;
   color?: string;
   availability: {
     [key: number]: DayAvailability;
   };
   shifts?: ShiftAssignment[];
+  preferences?: {
+    preferredShifts: string[];
+    preferredDays: string[];
+    maxHoursPerWeek: number;
+    minHoursPerWeek: number;
+  };
+  skills?: string[];
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface Shift {
   id: string;
   name: string;
-  startTime: Date;
-  endTime: Date;
+  startTime: string;  // HH:mm format
+  endTime: string;    // HH:mm format
   duration: number;
   requiredEmployees: number;
-  color?: string;
+  color: string;
+  isOvernight: boolean;
+  roles: ShiftRole[];
   assignedEmployees?: string[];
+}
+
+export interface ShiftRole {
+  roleId: string;
+  count: number;
+  duration: number;
 }
 
 export interface WeeklySchedule {
   id: string;
-  weekStart: Date;
-  weekEnd: Date;
+  weekStart: string;  // ISO date string
+  weekEnd: string;    // ISO date string
   shifts: {
     [date: string]: ShiftAssignment[];
   };
@@ -41,14 +60,55 @@ export interface BusinessHours {
   dayOfWeek: number;
   openTime: string;
   closeTime: string;
+  isOpen: boolean;
+  isClosed?: boolean;  // For backward compatibility
+}
+
+export interface DayHours {
+  start: string;
+  end: string;
   isClosed: boolean;
+}
+
+export interface EmployeeInsights {
+  employeeId: string;
+  totalHours: {
+    weekly: number;
+    monthly: number;
+    custom: number;
+  };
+  completedHours: {
+    weekly: number;
+    monthly: number;
+    custom: number;
+  };
+  futureHours: {
+    weekly: number;
+    monthly: number;
+    custom: number;
+  };
+  shiftBreakdown: Record<string, {
+    name: string;
+    hours: number;
+    completed: number;
+    upcoming: number;
+  }>;
+  lastUpdated: string;
 }
 
 export interface ShiftAssignment {
   id: string;
   shiftId: string;
   employeeId: string;
-  date: Date;
-  status: 'pending' | 'confirmed' | 'declined' | 'cancelled';
+  date: string;  // ISO date string
+  status: 'pending' | 'confirmed' | 'declined' | 'cancelled' | 'completed';
   notes?: string;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  icon: string;  // Material-UI icon name
+  color: string;
+  description?: string;
 } 

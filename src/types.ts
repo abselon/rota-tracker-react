@@ -22,24 +22,25 @@ export interface Employee {
   role: string | string[];  // Changed to support both single role and multiple roles
   email: string;
   phone: string;
-  availability: Record<string, AvailabilityDay>;
-  preferences: {
+  color?: string;
+  availability: Record<string, DayAvailability>;
+  shifts?: ShiftAssignment[];
+  preferences?: {
     preferredShifts: string[];
     preferredDays: string[];
     maxHoursPerWeek: number;
     minHoursPerWeek: number;
   };
-  skills: string[];
-  notes: string;
-  color: string;
-  createdAt: Date;
-  updatedAt: Date;
+  skills?: string[];
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-export interface AvailabilityDay {
+export interface DayAvailability {
+  isClosed: boolean;
   start: string;
   end: string;
-  isClosed: boolean;
 }
 
 export interface ShiftAssignment {
@@ -54,6 +55,7 @@ export interface ShiftAssignment {
 export interface WeeklySchedule {
   id: string;
   weekStart: string; // ISO date string
+  weekEnd: string; // ISO date string
   shifts: Record<string, ShiftAssignment[]>;
 }
 

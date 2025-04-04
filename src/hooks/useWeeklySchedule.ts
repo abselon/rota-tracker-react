@@ -26,6 +26,7 @@ export function useWeeklySchedule() {
       const newSchedule: WeeklySchedule = {
         id: `schedule-${formatDate(weekStart)}`,
         weekStart: weekStart.toISOString(),
+        weekEnd: weekEnd.toISOString(),
         shifts: {},
       };
 
@@ -106,11 +107,14 @@ export function useWeeklySchedule() {
       if (!schedule) return;
 
       const nextWeekStart = new Date(schedule.weekStart);
+      const nextWeekEnd = new Date(schedule.weekEnd);
       nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+      nextWeekEnd.setDate(nextWeekEnd.getDate() + 7);
 
       const newSchedule: WeeklySchedule = {
         id: `schedule-${formatDate(nextWeekStart)}`,
         weekStart: nextWeekStart.toISOString(),
+        weekEnd: nextWeekEnd.toISOString(),
         shifts: {},
       };
 

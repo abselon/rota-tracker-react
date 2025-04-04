@@ -60,13 +60,13 @@ import {
   SportsEsports as SportsEsportsIcon,
 } from '@mui/icons-material';
 import { useAppContext } from '../context/AppContext';
-import { Employee, AvailabilityDay, EmployeeInsights, ShiftAssignment, Role } from '../types';
+import { Employee, DayAvailability, EmployeeInsights, ShiftAssignment, Role } from '../types';
 import { generateUniqueColor, isColorTooSimilar } from '../utils/colorUtils';
 import { SketchPicker } from 'react-color';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isBefore, isAfter, parseISO } from 'date-fns';
 
 // Initialize default availability for each day of the week
-const defaultAvailability: Record<string, AvailabilityDay> = {
+const defaultAvailability: Record<string, DayAvailability> = {
   monday: { start: '09:00', end: '17:00', isClosed: false },
   tuesday: { start: '09:00', end: '17:00', isClosed: false },
   wednesday: { start: '09:00', end: '17:00', isClosed: false },
@@ -121,7 +121,7 @@ interface FormData {
   roles: string[];
   email: string;
   phone: string;
-  availability: Record<string, AvailabilityDay>;
+  availability: Record<string, DayAvailability>;
   preferences: {
     preferredShifts: string[];
     preferredDays: string[];
@@ -175,10 +175,15 @@ const EmployeeManagement: React.FC = () => {
         email: employee.email,
         phone: employee.phone,
         availability: employee.availability || defaultAvailability,
-        preferences: employee.preferences,
-        skills: employee.skills,
-        notes: employee.notes,
-        color: employee.color,
+        preferences: employee.preferences || {
+          preferredShifts: [],
+          preferredDays: [],
+          maxHoursPerWeek: 40,
+          minHoursPerWeek: 20,
+        },
+        skills: employee.skills || [],
+        notes: employee.notes || '',
+        color: employee.color || generateUniqueColor([]),
       });
     } else {
       setSelectedEmployee(null);
@@ -196,7 +201,7 @@ const EmployeeManagement: React.FC = () => {
         },
         skills: [],
         notes: '',
-        color: generateUniqueColor(employees.map(e => e.color)),
+        color: generateUniqueColor(employees.map(e => e.color || '')),
       });
     }
     setOpenDialog(true);
@@ -219,7 +224,7 @@ const EmployeeManagement: React.FC = () => {
       },
       skills: [],
       notes: '',
-      color: generateUniqueColor(employees.map(e => e.color)),
+      color: generateUniqueColor(employees.map(e => e.color || '')),
     });
     setFormError(null);
   };
@@ -236,7 +241,7 @@ const EmployeeManagement: React.FC = () => {
     const newColor = color.hex;
     const usedColors = employees
       .filter(emp => emp.id !== selectedEmployee?.id)
-      .map(emp => emp.color);
+      .map(emp => emp.color || '');
 
     if (isColorTooSimilar(newColor, usedColors)) {
       setFormError('This color is too similar to another employee\'s color. Please choose a different color.');
@@ -259,7 +264,7 @@ const EmployeeManagement: React.FC = () => {
       const employeeData = {
         ...formData,
         role: formData.roles,
-        createdAt: selectedEmployee ? selectedEmployee.createdAt : new Date(),
+        createdAt: selectedEmployee?.createdAt || new Date(),
         updatedAt: new Date(),
       };
 
@@ -631,14 +636,22 @@ const EmployeeManagement: React.FC = () => {
                           Shift Breakdown
                         </Typography>
                         <Stack spacing={1}>
-                          {Object.entries(insights.shiftBreakdown).map(([shiftId, data]) => (
-                            <Box key={shiftId} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="body2">{data.name}</Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {data.hours} hrs
-                              </Typography>
-                            </Box>
-                          ))}
+                          {Object.entries(insights.shiftBreakdown).map(([shiftId, data]) => {
+                            const breakdown = data as {
+                              name: string;
+                              hours: number;
+                              completed: number;
+                              upcoming: number;
+                            };
+                            return (
+                              <Box key={shiftId} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="body2">{breakdown.name}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {breakdown.hours} hrs
+                                </Typography>
+                              </Box>
+                            );
+                          })}
                         </Stack>
                       </Box>
                     </CardContent>
@@ -730,21 +743,22 @@ const EmployeeManagement: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Stack spacing={1}>
-                          {Object.entries(insights.shiftBreakdown).map(([shiftId, data]) => (
-                            <Box key={shiftId} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Box
-                                sx={{
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: '50%',
-                                  backgroundColor: employee.color,
-                                }}
-                              />
-                              <Typography variant="caption">
-                                {data.name}: {data.hours} hrs
-                              </Typography>
-                            </Box>
-                          ))}
+                          {Object.entries(insights.shiftBreakdown).map(([shiftId, data]) => {
+                            const breakdown = data as {
+                              name: string;
+                              hours: number;
+                              completed: number;
+                              upcoming: number;
+                            };
+                            return (
+                              <Box key={shiftId} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="body2">{breakdown.name}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  {breakdown.hours} hrs
+                                </Typography>
+                              </Box>
+                            );
+                          })}
                         </Stack>
                       </TableCell>
                     </TableRow>

@@ -29,6 +29,7 @@ import { format } from 'date-fns';
 
 interface FormData {
   weekStart: Date;
+  weekEnd: Date;
 }
 
 export default function WeeklyScheduleManagement() {
@@ -38,6 +39,7 @@ export default function WeeklyScheduleManagement() {
   const [editingSchedule, setEditingSchedule] = useState<WeeklySchedule | null>(null);
   const [formData, setFormData] = useState<FormData>({
     weekStart: new Date(),
+    weekEnd: new Date(),
   });
 
   const handleOpen = (schedule?: WeeklySchedule) => {
@@ -45,11 +47,13 @@ export default function WeeklyScheduleManagement() {
       setEditingSchedule(schedule);
       setFormData({
         weekStart: new Date(schedule.weekStart),
+        weekEnd: new Date(schedule.weekEnd),
       });
     } else {
       setEditingSchedule(null);
       setFormData({
         weekStart: new Date(),
+        weekEnd: new Date(),
       });
     }
     setOpen(true);
@@ -63,6 +67,7 @@ export default function WeeklyScheduleManagement() {
   const handleSubmit = async () => {
     const newSchedule: Omit<WeeklySchedule, 'id'> = {
       weekStart: format(formData.weekStart, 'yyyy-MM-dd'),
+      weekEnd: format(formData.weekEnd, 'yyyy-MM-dd'),
       shifts: {},
     };
 
@@ -157,6 +162,17 @@ export default function WeeklyScheduleManagement() {
                   onChange={(newValue) => {
                     if (newValue) {
                       setFormData({ ...formData, weekStart: newValue });
+                    }
+                  }}
+                />
+              </LocalizationProvider>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="Week End"
+                  value={formData.weekEnd}
+                  onChange={(newValue) => {
+                    if (newValue) {
+                      setFormData({ ...formData, weekEnd: newValue });
                     }
                   }}
                 />

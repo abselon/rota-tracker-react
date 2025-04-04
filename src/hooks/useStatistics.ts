@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Employee, ShiftAssignment, AvailabilityDay, BusinessHours, DayHours } from '../types';
+import { Employee, ShiftAssignment, DayAvailability, BusinessHours, DayHours } from '../types';
 
 interface EmployeeStats {
   totalShifts: number;
@@ -38,8 +38,8 @@ export function useStatistics() {
     // Calculate availability percentage
     let availabilityPercentage = 0;
     if (employee.availability) {
-      const availableDays = Object.values(employee.availability as Record<string, AvailabilityDay>).filter(
-        (day: AvailabilityDay) => !day.isClosed
+      const availableDays = Object.values(employee.availability as Record<string, DayAvailability>).filter(
+        (day: DayAvailability) => !day.isClosed
       ).length;
       availabilityPercentage = (availableDays / 7) * 100;
     }
@@ -97,7 +97,7 @@ export function useStatistics() {
 
       const totalShifts = employeeAssignments.length;
       const completedShifts = employeeAssignments.filter(
-        (assignment) => assignment.status === 'completed'
+        (assignment) => assignment.status === 'confirmed'
       ).length;
       const cancelledShifts = employeeAssignments.filter(
         (assignment) => assignment.status === 'cancelled'
@@ -116,8 +116,8 @@ export function useStatistics() {
       const employee = employees.find((emp) => emp.id === employeeId);
       let availabilityPercentage = 100;
       if (employee?.availability) {
-        const availableDays = Object.values(employee.availability as Record<string, AvailabilityDay>).filter(
-          (day: AvailabilityDay) => !day.isClosed
+        const availableDays = Object.values(employee.availability as Record<string, DayAvailability>).filter(
+          (day: DayAvailability) => !day.isClosed
         ).length;
         availabilityPercentage = (availableDays / 7) * 100;
       }
@@ -144,7 +144,7 @@ export function useStatistics() {
 
       const totalAssignments = shiftAssignments.length;
       const completedAssignments = shiftAssignments.filter(
-        (assignment) => assignment.status === 'completed'
+        (assignment) => assignment.status === 'confirmed'
       ).length;
       const cancelledAssignments = shiftAssignments.filter(
         (assignment) => assignment.status === 'cancelled'
